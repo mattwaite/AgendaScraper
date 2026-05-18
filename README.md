@@ -38,7 +38,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 **3. Install Python dependencies**
 
 ```bash
-pip install playwright beautifulsoup4
+pip install -r requirements.txt
 ```
 
 **4. Download the Playwright browser**
