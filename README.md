@@ -24,7 +24,7 @@ Running the script produces `council_meetings.csv` with four columns:
 **1. Clone the repository**
 
 ```bash
-git clone https://github.com/<your-username>/AgendaScraper.git
+git clone https://github.com/mattwaite/AgendaScraper.git
 cd AgendaScraper
 ```
 
