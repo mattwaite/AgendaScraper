@@ -1,0 +1,70 @@
+[
+  {
+    "step": "1-baseline",
+    "payload": {
+      "name": "Lincoln City Council Regular Meeting",
+      "dateTime": "2026-08-31T17:30:00-05:00",
+      "agencyId": "cmryg8k2p0001s91mclkzpdnq",
+      "location": "Council Chambers, County/City Building, 555 South 10th Street, Lincoln 68508",
+      "agendaUrl": "https://lnklan.granicus.com/AgendaViewer.php?view_id=2&clip_id=426",
+      "meetingType": "REGULAR"
+    },
+    "id": "cmttb835x0004qi1y0os8246a",
+    "created": true,
+    "reason": null
+  },
+  {
+    "step": "2-readback",
+    "meetings": [
+      {
+        "id": "cmttb835x0004qi1y0os8246a",
+        "name": "Lincoln City Council Regular Meeting",
+        "dateTime": "2026-08-31T22:30:00.000Z",
+        "location": "Council Chambers, County/City Building, 555 South 10th Street, Lincoln 68508",
+        "importFingerprint": "cmryg8k2p0001s91mclkzpdnq::lincoln city council regular meeting::1788215400000"
+      }
+    ]
+  },
+  {
+    "step": "3-identical",
+    "payload": {
+      "name": "Lincoln City Council Regular Meeting",
+      "dateTime": "2026-08-31T17:30:00-05:00",
+      "agencyId": "cmryg8k2p0001s91mclkzpdnq",
+      "location": "Council Chambers, County/City Building, 555 South 10th Street, Lincoln 68508",
+      "agendaUrl": "https://lnklan.granicus.com/AgendaViewer.php?view_id=2&clip_id=426",
+      "meetingType": "REGULAR"
+    },
+    "id": "cmttb835x0004qi1y0os8246a",
+    "created": false,
+    "reason": "duplicate"
+  },
+  {
+    "step": "4-different-datetime",
+    "payload": {
+      "name": "Lincoln City Council Regular Meeting",
+      "dateTime": "2026-08-24T15:00:00-05:00",
+      "agencyId": "cmryg8k2p0001s91mclkzpdnq",
+      "location": "Council Chambers, County/City Building, 555 South 10th Street, Lincoln 68508",
+      "agendaUrl": "https://lnklan.granicus.com/AgendaViewer.php?view_id=2&clip_id=425",
+      "meetingType": "REGULAR"
+    },
+    "id": "cmttb83k00006qi1yatk5p46m",
+    "created": true,
+    "reason": null
+  },
+  {
+    "step": "5-perturbed-name",
+    "payload": {
+      "name": "Lincoln City Council Regular Meeting (fingerprint probe)",
+      "dateTime": "2026-08-31T17:30:00-05:00",
+      "agencyId": "cmryg8k2p0001s91mclkzpdnq",
+      "location": "Council Chambers, County/City Building, 555 South 10th Street, Lincoln 68508",
+      "agendaUrl": "https://lnklan.granicus.com/AgendaViewer.php?view_id=2&clip_id=426",
+      "meetingType": "REGULAR"
+    },
+    "id": "cmttb83n20008qi1y51wyrj2b",
+    "created": true,
+    "reason": null
+  }
+]
