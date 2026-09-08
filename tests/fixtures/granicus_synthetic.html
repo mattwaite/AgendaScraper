@@ -1,0 +1,90 @@
+<!--
+Hand-built stand-in for the Granicus page, covering cases the live capture does
+not currently show: a populated Upcoming Events table, two meetings on the same
+day, a meeting whose agenda has not been posted yet, and a row that appears in
+both the upcoming and archive tables.
+-->
+<html>
+  <body>
+    <h2>Upcoming Events</h2>
+    <table class="listingTable" summary="Upcoming and In Progress Events">
+      <thead>
+        <tr>
+          <th class="listHeader" id="Name" scope="col">Name</th>
+          <th class="listHeader" id="Date" scope="col">Date</th>
+          <th class="listHeader" id="AgendaLink" scope="col">Agenda</th>
+          <th class="listHeader" id="AgendaPacketLink" scope="col">Packet</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="listingRow">
+          <td class="listItem">City Council - Action</td>
+          <td class="listItem">Sep 14, 2026
+                          -
+                             3:00 PM</td>
+          <td class="listItem"><a href="//lnklan.granicus.com/AgendaViewer.php?view_id=2&amp;clip_id=430">Agenda</a></td>
+          <td class="listItem"><a href="//lnklan.granicus.com/AgendaPacket.php?clip_id=430">Packet</a></td>
+        </tr>
+        <tr class="listingRow">
+          <td class="listItem">City Council - Pre-Council</td>
+          <td class="listItem">Sep 14, 2026 - 1:00 PM</td>
+          <td class="listItem"><a href="//lnklan.granicus.com/AgendaViewer.php?view_id=2&amp;clip_id=431">Agenda</a></td>
+          <td class="listItem">&nbsp;</td>
+        </tr>
+        <tr class="listingRow">
+          <td class="listItem">City Council - Special Meeting</td>
+          <td class="listItem">Sep 21, 2026 - 5:30 PM</td>
+          <td class="listItem">&nbsp;</td>
+          <td class="listItem">&nbsp;</td>
+        </tr>
+        <tr class="listingRow">
+          <td class="listItem">City Council - Public Hearing</td>
+          <td class="listItem">Jan 11, 2027 - 5:30 PM</td>
+          <td class="listItem"><a href="//lnklan.granicus.com/AgendaViewer.php?view_id=2&amp;clip_id=440">Agenda</a></td>
+          <td class="listItem">&nbsp;</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Available Archives</h2>
+    <div class="TabbedPanels">
+      <ul class="TabbedPanelsTabGroup">
+        <li class="TabbedPanelsTab">2026</li>
+      </ul>
+      <div class="TabbedPanelsContentGroup">
+        <div class="TabbedPanelsContent">
+          <table class="listingTable" summary="Archives">
+            <thead>
+              <tr>
+                <th class="listHeader" id="Name" scope="col">Name</th>
+                <th class="listHeader" id="Date" scope="col">Date</th>
+                <th class="listHeader" id="ActionLink" scope="col">Action</th>
+                <th class="listHeader" id="MinutesLink" scope="col">Minutes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="listingRow">
+                <td class="listItem">City Council - Action</td>
+                <td class="listItem">Sep 14, 2026 - 3:00 PM</td>
+                <td class="listItem"><a href="//lnklan.granicus.com/AgendaViewer.php?view_id=2&amp;clip_id=430">Agenda</a></td>
+                <td class="listItem"><a href="//lnklan.granicus.com/MinutesViewer.php?view_id=2&amp;clip_id=430">Minutes</a></td>
+              </tr>
+              <tr class="listingRow">
+                <td class="listItem">City Council - Action</td>
+                <td class="listItem">Aug 31, 2026 - 5:30 PM</td>
+                <td class="listItem"><a href="//lnklan.granicus.com/AgendaViewer.php?view_id=2&amp;clip_id=426">Agenda</a></td>
+                <td class="listItem"><a href="//lnklan.granicus.com/MinutesViewer.php?view_id=2&amp;clip_id=426">Minutes</a></td>
+              </tr>
+              <tr class="listingRow">
+                <td class="listItem">City Council - Action</td>
+                <td class="listItem">Jan 5, 2026 - 3:00 PM</td>
+                <td class="listItem"><a href="//lnklan.granicus.com/AgendaViewer.php?view_id=2&amp;clip_id=397">Agenda</a></td>
+                <td class="listItem"><a href="//lnklan.granicus.com/MinutesViewer.php?view_id=2&amp;clip_id=397">Minutes</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

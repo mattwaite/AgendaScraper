@@ -1,64 +1,101 @@
-# Lincoln City Council Agenda Scraper
+# Flatwater Free Press Agenda Scrapers
 
-Scrapes the current year's City Council meeting schedule from Lincoln, Nebraska's public Granicus portal and writes a CSV with the date, time, location, and agenda PDF link for each meeting.
+Scrapes meeting schedules from Nebraska government bodies and pushes them to the
+NE Civic Newsroom API, which editors use to assign reporters to meetings. One
+scraper per government body; a shared client handles authentication and
+deduplication so a scraper is only a parser.
 
-## Output
+Currently implemented: **Lincoln City Council**.
 
-Running the script produces `council_meetings.csv` with four columns:
+## Setup
 
-| Column | Description |
-|---|---|
-| `time` | Meeting start time (e.g. `3:00 PM`) |
-| `date` | Meeting date in ISO 8601 format (e.g. `2026-01-05`) |
-| `place` | Always `Council Chambers, County/City Building, 555 South 10th Street, Lincoln 68508` |
-| `agenda_pdf_url` | Direct URL to the agenda PDF on the Granicus document server |
-
-## Requirements
-
-- Python 3.10 or later
-- [Playwright](https://playwright.dev/python/) (drives a headless Chromium browser to load the Granicus page)
-- [Beautiful Soup 4](https://www.crummy.com/software/BeautifulSoup/)
-
-## Installation
-
-**1. Clone the repository**
+Requires Python 3.10+.
 
 ```bash
-git clone https://github.com/mattwaite/AgendaScraper.git
-cd AgendaScraper
-```
-
-**2. Create and activate a virtual environment** (recommended)
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-```
-
-**3. Install Python dependencies**
-
-```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-**4. Download the Playwright browser**
-
-Playwright needs a copy of Chromium the first time you run it:
-
-```bash
 playwright install chromium
+cp .env.example .env   # then paste in the API key
 ```
+
+`.env` holds `PLATFORM_API_KEY` (from the NE Civic Newsroom admin dashboard) and
+`PLATFORM_API_BASE_URL`. It is gitignored — never commit the key.
 
 ## Usage
 
 ```bash
-python3 scrape_council.py
+python3 -m scrapers.run --list                          # known scrapers
+python3 -m scrapers.run lincoln_city_council --dry-run  # scrape, print payloads, POST nothing
+python3 -m scrapers.run lincoln_city_council            # scrape and submit
 ```
 
-The script prints a confirmation and writes `council_meetings.csv` in the current directory.
+Useful flags:
 
-## Notes
+| Flag | Effect |
+|---|---|
+| `--dry-run` | Scrape and dedup-check, print the exact JSON payloads, submit nothing |
+| `--format csv\|json` with `--out FILE` | Write meetings to a file instead of submitting |
+| `--since` / `--until` | Override the default window (7 days back → 400 days ahead), `YYYY-MM-DD` |
+| `--limit N` | Keep only the earliest N meetings — for `--dry-run` and CSV/JSON output |
+| `--allow-same-day` | Submit even when a same-named meeting already exists on that date |
+| `-v` | Debug logging, including every skip and its reason |
 
-- The scraper targets the first year tab on the Granicus page, which is always the current calendar year. It will automatically pick up the correct year when run in future years.
-- The agenda PDF URLs resolve directly — no login or further navigation required.
-- The city's website (`lincoln.ne.gov`) blocks automated HTTP clients; the script fetches data from the underlying Granicus embed URL instead.
+Each run ends with a summary:
+
+```
+scraped 12 / new 3 / duplicate 9 / time-changed 0 / skipped-no-agenda 1 / failed 0
+```
+
+- `duplicate` — already on the platform; nothing was sent.
+- `time-changed` — a meeting with this name already exists on this date at a
+  different time. The platform has no update or delete endpoint, so submitting
+  would leave two records that nobody can remove; the run warns and skips
+  instead. Fix the time by hand, or pass `--allow-same-day` if the body really
+  does meet twice that day.
+- `skipped-no-agenda` — the API requires an agenda URL and this meeting's isn't
+  posted yet. A later run picks it up.
+
+Runs are safe to repeat: a second run immediately after the first reports
+`new 0`.
+
+Before changing anything about how meetings are named, read
+[`docs/api-notes.md`](docs/api-notes.md) — meeting names are part of the
+platform's deduplication fingerprint.
+
+## Adding a scraper for another agency
+
+1. Create `scrapers/agencies/<agency>.py` with a `BaseScraper` subclass that
+   sets `slug`, `agency_id` (from `docs/api-notes.md`), and `agency_name`, and
+   implements `fetch() -> list[Meeting]`.
+2. Define the agency's meeting names as constants, one per meeting type.
+   **Names must never change once submitted** — they are part of the API's
+   deduplication fingerprint. See `docs/api-notes.md`.
+3. Increment `self.skipped_no_agenda` for meetings with no agenda URL rather
+   than submitting them.
+4. Register the class in `scrapers/registry.py`.
+5. Save a copy of the source page under `tests/fixtures/` and write parser tests
+   against it.
+
+No API code belongs in a scraper — the runner handles agency verification,
+deduplication, and submission.
+
+## Layout
+
+| Path | What it is |
+|---|---|
+| `scrapers/meeting.py` | The `Meeting` record and its API payload |
+| `scrapers/client.py` | The only code that talks HTTP to the platform |
+| `scrapers/base.py` | `BaseScraper` — the contract a scraper implements |
+| `scrapers/run.py` | CLI: dedup, submit, report |
+| `scrapers/agencies/` | One module per government body |
+| `docs/api-notes.md` | API behavior learned by probing; read before changing names |
+| `tools/probe_fingerprint.py` | One-off experiment that established the dedup rule |
+
+## Tests
+
+```bash
+python3 -m pytest
+```
+
+Parser tests run against saved HTML in `tests/fixtures/`, so they need no
+network and no browser.
