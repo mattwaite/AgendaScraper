@@ -9,10 +9,14 @@ Currently implemented:
 
 | Agency | Slug | Source |
 |---|---|---|
-| Lincoln City Council | `lincoln_city_council` | Granicus portal |
+| Lincoln City Council | `lincoln_city_council` | Granicus portal + city meeting calendar |
 | Lancaster County Board of Commissioners | `lancaster_county_commissioners` | CivicPlus Agenda Center + agenda PDFs |
 | Lincoln Public Schools Board of Education | `lps_board_of_education` | SPARQ Data portal |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | lincoln.ne.gov calendar + landing page |
+
+The two lincoln.ne.gov calendars are the only Lincoln sources that publish
+meetings months ahead of their agendas. Granicus, the Agenda Center and SPARQ
+all list a meeting only once its agenda is posted.
 
 ## Setup
 
@@ -130,6 +134,7 @@ deduplication, and submission.
 | `scrapers/base.py` | `BaseScraper` — the contract a scraper implements |
 | `scrapers/run.py` | CLI: dedup, submit, report |
 | `scrapers/agencies/` | One module per government body |
+| `scrapers/sources/` | Parsers for a publishing platform shared by several agencies |
 | `docs/api-notes.md` | Verified API behavior; read before adding a scraper |
 | `tools/verify_upsert.py` | Proves upsert works, against the sandbox agency |
 
