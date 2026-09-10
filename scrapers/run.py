@@ -76,13 +76,13 @@ def submit(
     platform itself decides between creating, adopting, updating and ignoring,
     and its answer is more trustworthy than anything we could work out here.
     """
-    counts = dict.fromkeys((*OUTCOMES, "conflict", "failed"), 0)
+    counts = dict.fromkeys((*OUTCOMES, "conflict", "failed", "would-submit"), 0)
 
     for meeting in meetings:
         payload = meeting.to_payload(scraper.agency_id)
         if dry_run:
             log.info("would POST %s", json.dumps(payload))
-            counts["created"] += 1
+            counts["would-submit"] += 1
             continue
 
         try:
@@ -230,11 +230,19 @@ def main(argv: list[str] | None = None) -> int:
         log.error("%s", exc)
         return 1
 
-    prefix = "DRY RUN: " if args.dry_run else ""
-    tally = " / ".join(f"{name} {counts[name]}" for name in OUTCOMES)
     skipped = f" / skipped {len(scraper.skipped)}" if scraper.skipped else ""
+    if args.dry_run:
+        # Without a POST there is no way to know which of these the platform
+        # already has, so don't imply they would all be new.
+        print(
+            f"DRY RUN: scraped {len(meetings)} / "
+            f"would submit {counts['would-submit']}{skipped}"
+        )
+        return 0
+
+    tally = " / ".join(f"{name} {counts[name]}" for name in OUTCOMES)
     print(
-        f"{prefix}scraped {len(meetings)} / {tally} / "
+        f"scraped {len(meetings)} / {tally} / "
         f"conflict {counts['conflict']} / failed {counts['failed']}{skipped}"
     )
     return 1 if counts["failed"] or counts["conflict"] else 0
