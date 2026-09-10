@@ -2,7 +2,8 @@
 
 import logging
 import os
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
@@ -12,8 +13,12 @@ from urllib3.util import Retry
 
 log = logging.getLogger(__name__)
 
-DEFAULT_BASE_URL = "https://necivicnewsroom.up.railway.app/api/v1"
+DEFAULT_BASE_URL = "https://civicnewsroom.org/api/v1"
 TIMEOUT = 30
+
+# No limit is enforced, but the platform asks for under ~60 requests a minute.
+# Applied to writes only -- a run makes two GETs and many POSTs.
+MIN_WRITE_INTERVAL = 1.0
 
 
 class PlatformError(RuntimeError):
@@ -28,11 +33,31 @@ class AgencyNotFoundError(PlatformError):
     """404 -- the agencyId does not exist."""
 
 
+class CollisionError(PlatformError):
+    """409 -- the payload matches a different meeting than the one we addressed.
+
+    Happens when a meeting's externalId changes between runs: the new id looks
+    like a new meeting, but its fingerprint already belongs to the record filed
+    under the old id. Needs a human with PATCH or DELETE; see docs/api-notes.md.
+    """
+
+
 @dataclass(frozen=True)
 class SubmitResult:
     id: str | None
     created: bool
     reason: str | None = None
+    updated: bool = False
+    changed: list[str] = field(default_factory=list)
+
+    @property
+    def outcome(self) -> str:
+        """One of created / adopted / updated / duplicate."""
+        if self.created:
+            return "created"
+        if self.updated:
+            return "updated"
+        return self.reason or "duplicate"
 
 
 def load_dotenv(path: Path | None = None) -> None:
@@ -82,9 +107,18 @@ class PlatformClient:
             raise_on_status=False,
         )
         self.session.mount("https://", HTTPAdapter(max_retries=retry))
+        self._last_write = 0.0
+
+    def _throttle(self) -> None:
+        elapsed = time.monotonic() - self._last_write
+        if elapsed < MIN_WRITE_INTERVAL:
+            time.sleep(MIN_WRITE_INTERVAL - elapsed)
+        self._last_write = time.monotonic()
 
     def _request(self, method: str, path: str, **kwargs) -> requests.Response:
         url = f"{self.base_url}/{path.lstrip('/')}"
+        if method != "GET":
+            self._throttle()
         try:
             response = self.session.request(method, url, timeout=TIMEOUT, **kwargs)
         except requests.RequestException as exc:
@@ -133,12 +167,41 @@ class PlatformClient:
             )
         return response.json()
 
-    def create_meeting(self, payload: dict) -> SubmitResult:
-        """POST one meeting.
+    def delete_meeting(self, meeting_id: str) -> bool:
+        """Really delete a meeting, freeing its fingerprint for re-import.
 
-        A duplicate is a normal outcome, not an error: the API answers 201 with
-        created:true for a new meeting and 200 with created:false when its
-        importFingerprint already exists.
+        Returns False if the platform refused because an editor has already
+        attached an assignment -- those carry freelancer applications and
+        payment records, so clearing them is a human's decision.
+        """
+        response = self._request("DELETE", f"/meetings/{meeting_id}")
+        if response.status_code == 409:
+            body = response.json()
+            log.warning(
+                "refused to delete %s: %s assignment(s) attached",
+                meeting_id,
+                body.get("assignmentCount", "some"),
+            )
+            return False
+        if not response.ok:
+            raise PlatformError(
+                f"DELETE /meetings/{meeting_id} returned {response.status_code}: "
+                f"{response.text[:200]}"
+            )
+        return True
+
+    def submit_meeting(self, payload: dict) -> SubmitResult:
+        """Upsert one meeting.
+
+        With an externalId in the payload this is an upsert keyed on that id, so
+        every outcome below is normal rather than an error:
+
+            201 created:true                      -- new meeting
+            200 reason:"adopted"                  -- matched a meeting we had
+                                                     submitted before externalId
+                                                     existed, and claimed it
+            200 updated:true, changed:[...]       -- the meeting moved
+            200 reason:"duplicate"                -- nothing changed
         """
         response = self._request("POST", "/meetings", json=payload)
         if response.status_code in (200, 201):
@@ -147,6 +210,13 @@ class PlatformClient:
                 id=body.get("id"),
                 created=bool(body.get("created")),
                 reason=body.get("reason"),
+                updated=bool(body.get("updated")),
+                changed=body.get("changed") or [],
+            )
+        if response.status_code == 409:
+            raise CollisionError(
+                f"409 for externalId {payload.get('externalId')!r} "
+                f"({payload.get('dateTime')}): {response.text[:200]}"
             )
         raise PlatformError(
             f"POST /meetings returned {response.status_code}: {response.text[:300]}\n"

@@ -57,12 +57,12 @@ def test_classify(title, expected):
 
 def test_reads_upcoming_and_archive_tables():
     _, meetings = parse_fixture()
-    # Sep 14 x2 and Jan 11 2027 come from the upcoming table. Sep 21 has no
-    # agenda, and both archive rows (Aug 31, Jan 5) fall outside the 7-day
-    # lookback from Sep 8.
+    # All four upcoming rows, including Sep 21 which has no agenda yet. Both
+    # archive rows (Aug 31, Jan 5) fall outside the 7-day lookback from Sep 8.
     assert [m.starts_at.date() for m in meetings] == [
         date(2026, 9, 14),
         date(2026, 9, 14),
+        date(2026, 9, 21),
         date(2027, 1, 11),
     ]
 
@@ -77,19 +77,59 @@ def test_two_meetings_on_the_same_day_both_survive():
     _, meetings = parse_fixture()
     sep14 = [m for m in meetings if m.starts_at.date() == date(2026, 9, 14)]
     assert len(sep14) == 2
-    assert {m.source_id for m in sep14} == {"430", "431"}
+    assert {m.external_id for m in sep14} == {"lnk-clip-430", "lnk-clip-431"}
     assert {m.meeting_type for m in sep14} == {"REGULAR", "WORKSHOP"}
 
 
-def test_meeting_without_an_agenda_is_skipped_and_counted():
-    scraper, meetings = parse_fixture()
-    assert date(2026, 9, 21) not in [m.starts_at.date() for m in meetings]
-    assert scraper.skipped_no_agenda == 1
+def test_meeting_without_an_agenda_is_still_submitted():
+    """agendaUrl is optional, so a meeting goes in as soon as it is scheduled
+    and picks up its agenda URL on a later run."""
+    _, meetings = parse_fixture()
+    sep21 = [m for m in meetings if m.starts_at.date() == date(2026, 9, 21)]
+    assert len(sep21) == 1
+    assert sep21[0].agenda_url is None
+    assert sep21[0].meeting_type == "SPECIAL"
+
+
+def test_external_id_falls_back_to_the_date_with_no_links_to_borrow():
+    """No clip_id anywhere in the row. Never seen on this portal, but the id
+    still has to be deterministic rather than absent."""
+    _, meetings = parse_fixture()
+    sep21 = [m for m in meetings if m.starts_at.date() == date(2026, 9, 21)][0]
+    assert sep21.external_id == "lnk-date-2026-09-21"
+
+
+def test_external_id_comes_from_any_link_carrying_a_clip_id():
+    """Granicus puts clip_id in the minutes and video links too, so a row keeps
+    a stable id even when its agenda link is missing."""
+    scraper = LincolnCityCouncil()
+    html = """<table class="listingTable"><tr class="listingRow">
+      <td>City Council - Action</td><td>Sep 28, 2026 - 3:00 PM</td>
+      <td>&nbsp;</td>
+      <td><a href="//lnklan.granicus.com/MinutesViewer.php?view_id=2&clip_id=433">Minutes</a></td>
+    </tr></table>"""
+    meetings = scraper.parse(html, today=TODAY)
+    assert meetings[0].external_id == "lnk-clip-433"
+    assert meetings[0].agenda_url is None
 
 
 def test_a_meeting_listed_in_both_tables_appears_once():
     _, meetings = parse_fixture()
-    assert [m.source_id for m in meetings].count("430") == 1
+    assert [m.external_id for m in meetings].count("lnk-clip-430") == 1
+
+
+def test_external_id_is_stable_when_a_meeting_moves():
+    """The whole point of externalId: a rescheduled meeting keeps its id, so
+    the platform updates that record instead of filing a second one."""
+    scraper = LincolnCityCouncil()
+    row = """<table class="listingTable"><tr class="listingRow">
+      <td>City Council - Action</td><td>Sep 14, 2026 - {time}</td>
+      <td><a href="//lnklan.granicus.com/AgendaViewer.php?view_id=2&clip_id=430">Agenda</a></td>
+    </tr></table>"""
+    before = scraper.parse(row.format(time="3:00 PM"), today=TODAY)[0]
+    after = scraper.parse(row.format(time="5:30 PM"), today=TODAY)[0]
+    assert before.external_id == after.external_id
+    assert before.starts_at != after.starts_at
 
 
 def test_since_overrides_the_rolling_window():
@@ -111,7 +151,8 @@ def test_names_are_constant_per_meeting_type():
 
 def test_agenda_urls_are_absolute():
     _, meetings = parse_fixture()
-    assert all(m.agenda_url.startswith("https://") for m in meetings)
+    found = [m.agenda_url for m in meetings if m.agenda_url]
+    assert found and all(url.startswith("https://") for url in found)
 
 
 def test_live_capture_still_parses():

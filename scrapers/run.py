@@ -11,14 +11,24 @@ import csv
 import json
 import logging
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from . import registry
 from .base import BaseScraper, ScraperError
-from .client import PlatformClient, PlatformError
-from .meeting import CENTRAL, Meeting
+from .client import CollisionError, PlatformClient, PlatformError
+from .meeting import Meeting
 
 log = logging.getLogger("scrapers")
+
+
+class UnexpectedCreate(RuntimeError):
+    """A meeting was created when an existing record was expected.
+
+    Only raised under --stop-on-unexpected-create, which exists for the first
+    run against an agency that already has meetings on the platform: those
+    should come back `adopted`, and a `created` means they were not matched and
+    the run is about to duplicate them.
+    """
 
 
 def parse_date(value: str) -> date:
@@ -30,51 +40,7 @@ def parse_date(value: str) -> date:
         ) from None
 
 
-def existing_keys(client: PlatformClient, scraper: BaseScraper, meetings: list[Meeting]) -> set:
-    """Keys for meetings the platform already has, so we never POST a known dupe.
-
-    Two kinds of key, because they catch different things:
-
-    * the importFingerprint (agencyId::lowercased name::epoch ms) -- an exact
-      match on what the server itself dedups with.
-    * (name, local date) -- catches a meeting whose *time* changed at the source.
-      A new time is a new fingerprint, so the API would happily create a second
-      record, and there is no PATCH or DELETE to clean up after it.
-
-    The second key is a heuristic, because GET /meetings returns only id, name,
-    dateTime, location and importFingerprint -- no agendaUrl, and nothing else
-    that would identify the same real-world meeting across a time change.
-    """
-    if not meetings:
-        return set()
-    # Pad a day either side: the API's `to` bound cuts at midnight, so an
-    # unpadded query silently omits meetings on the last day of the range.
-    window_start = min(m.starts_at for m in meetings).date() - timedelta(days=1)
-    window_end = max(m.starts_at for m in meetings).date() + timedelta(days=1)
-    existing = client.list_meetings(
-        scraper.agency_id, from_=window_start, to=window_end
-    )
-
-    keys = set()
-    for record in existing:
-        if fingerprint := record.get("importFingerprint"):
-            keys.add(("fingerprint", fingerprint))
-        raw_dt, name = record.get("dateTime"), record.get("name")
-        if raw_dt and name:
-            try:
-                stored = datetime.fromisoformat(raw_dt.replace("Z", "+00:00"))
-            except ValueError:
-                continue
-            keys.add(name_date_key(name, stored.astimezone(CENTRAL).date()))
-    return keys
-
-
-def name_date_key(name: str, day: date) -> tuple:
-    return ("name-date", name.lower(), day.isoformat())
-
-
-def fingerprint_key(meeting: Meeting, agency_id: str) -> tuple:
-    return ("fingerprint", meeting.fingerprint(agency_id))
+OUTCOMES = ("created", "adopted", "updated", "duplicate")
 
 
 def write_rows(meetings: list[Meeting], fmt: str, out: str | None) -> None:
@@ -102,52 +68,63 @@ def submit(
     scraper: BaseScraper,
     meetings: list[Meeting],
     dry_run: bool,
-    allow_same_day: bool = False,
+    stop_on_unexpected_create: bool = False,
 ) -> dict[str, int]:
-    counts = {"new": 0, "duplicate": 0, "time-changed": 0, "failed": 0}
-    known = existing_keys(client, scraper, meetings)
+    """Upsert every scraped meeting and tally what the API said it did.
+
+    There is no local pre-check: submission is keyed on externalId, so the
+    platform itself decides between creating, adopting, updating and ignoring,
+    and its answer is more trustworthy than anything we could work out here.
+    """
+    counts = dict.fromkeys((*OUTCOMES, "conflict", "failed"), 0)
 
     for meeting in meetings:
-        if fingerprint_key(meeting, scraper.agency_id) in known:
-            log.debug("already on the platform: %s", meeting.date_time)
-            counts["duplicate"] += 1
-            continue
-
-        same_day = name_date_key(meeting.name, meeting.starts_at.date())
-        if same_day in known and not allow_same_day:
-            log.warning(
-                "%s on %s is already on the platform at a different time. Its "
-                "time appears to have changed; submitting would create a second "
-                "record that cannot be deleted, so it is being skipped. Fix the "
-                "time by hand, or re-run with --allow-same-day if this really is "
-                "a second meeting that day.",
-                meeting.name,
-                meeting.starts_at.date().isoformat(),
-            )
-            counts["time-changed"] += 1
-            continue
-
         payload = meeting.to_payload(scraper.agency_id)
         if dry_run:
             log.info("would POST %s", json.dumps(payload))
-            counts["new"] += 1
+            counts["created"] += 1
             continue
 
         try:
-            result = client.create_meeting(payload)
+            result = client.submit_meeting(payload)
+        except CollisionError as exc:
+            log.error(
+                "collision on %s: %s. The meeting's externalId has changed "
+                "since it was filed. Resolve it by hand -- see the recovery "
+                "section of docs/api-notes.md.",
+                meeting.date_time,
+                exc,
+            )
+            counts["conflict"] += 1
+            continue
         except PlatformError as exc:
             log.error("POST failed for %s: %s", meeting.date_time, exc)
             counts["failed"] += 1
             continue
 
-        if result.created:
-            log.info("created %s (%s)", meeting.date_time, result.id)
-            counts["new"] += 1
-        else:
-            log.debug(
-                "duplicate per API (%s): %s", result.reason, meeting.date_time
+        outcome = result.outcome
+        counts[outcome] = counts.get(outcome, 0) + 1
+
+        if outcome == "updated":
+            log.info(
+                "updated %s (%s): %s changed",
+                meeting.date_time,
+                meeting.external_id,
+                ", ".join(result.changed) or "something",
             )
-            counts["duplicate"] += 1
+        elif outcome == "duplicate":
+            log.debug("unchanged %s (%s)", meeting.date_time, meeting.external_id)
+        else:
+            log.info("%s %s (%s)", outcome, meeting.date_time, result.id)
+
+        if outcome == "created" and stop_on_unexpected_create:
+            raise UnexpectedCreate(
+                f"{meeting.name} on {meeting.date_time} was created rather than "
+                "adopted, which means the meeting was not recognized as one "
+                "already on the platform. Stopping before this run can create "
+                "duplicates of everything else. Re-run without "
+                "--stop-on-unexpected-create once you have checked why."
+            )
     return counts
 
 
@@ -199,10 +176,11 @@ def main(argv: list[str] | None = None) -> int:
         "you want and records cannot be deleted",
     )
     parser.add_argument(
-        "--allow-same-day",
+        "--stop-on-unexpected-create",
         action="store_true",
-        help="submit a meeting even when one with the same name already exists "
-        "on that date at a different time (see --help for --limit's warning)",
+        help="abort the moment a meeting is created rather than adopted -- use "
+        "on the first run against an agency whose meetings were submitted "
+        "before externalId existed",
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args(argv)
@@ -235,31 +213,29 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.format in ("csv", "json"):
         write_rows(meetings, args.format, args.out)
-        print(
-            f"scraped {len(meetings)} / "
-            f"skipped-no-agenda {scraper.skipped_no_agenda}"
-        )
+        print(f"scraped {len(meetings)}")
         return 0
 
     try:
         client = PlatformClient()
         verify_agency(client, scraper)
         counts = submit(
-            client, scraper, meetings, args.dry_run, args.allow_same_day
+            client, scraper, meetings, args.dry_run, args.stop_on_unexpected_create
         )
+    except UnexpectedCreate as exc:
+        log.error("%s", exc)
+        return 1
     except PlatformError as exc:
         log.error("%s", exc)
         return 1
 
     prefix = "DRY RUN: " if args.dry_run else ""
+    tally = " / ".join(f"{name} {counts[name]}" for name in OUTCOMES)
     print(
-        f"{prefix}scraped {len(meetings)} / new {counts['new']} / "
-        f"duplicate {counts['duplicate']} / "
-        f"time-changed {counts['time-changed']} / "
-        f"skipped-no-agenda {scraper.skipped_no_agenda} / "
-        f"failed {counts['failed']}"
+        f"{prefix}scraped {len(meetings)} / {tally} / "
+        f"conflict {counts['conflict']} / failed {counts['failed']}"
     )
-    return 1 if counts["failed"] else 0
+    return 1 if counts["failed"] or counts["conflict"] else 0
 
 
 if __name__ == "__main__":

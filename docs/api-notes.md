@@ -1,99 +1,142 @@
 # Platform API notes
 
-Things learned by probing the live API that the [scraper API
-guide](https://necivicnewsroom.up.railway.app/docs/scraper-api-guide) does not
-say. Probed 2026-09-08 with `tools/probe_fingerprint.py`; raw log in
-`probe-results.json`.
+How this project uses the NE Civic Newsroom API, and what has been verified
+against production rather than assumed. The [scraper API
+guide](https://civicnewsroom.org/docs/scraper-api-guide) is the source of truth;
+this file records the parts that affect scraper design.
+
+Last verified 2026-09-10 with `tools/verify_upsert.py`.
+
+> **Historical note.** Before 2026-09-10 this file documented a very different
+> API: no `externalId`, no `PATCH`/`DELETE`, and deduplication on an
+> `importFingerprint` that covered the meeting's `name` — which meant meeting
+> names had to be frozen forever and a rescheduled meeting could not be fixed.
+> All of that is gone. `docs/probe-results.json` is the record of how those
+> rules were worked out, kept because it explains why earlier commits look the
+> way they do. Do not design against it.
 
 ## Base URL
 
-`https://necivicnewsroom.up.railway.app/api/v1` — the published guide shows a
-`https://your-domain.com/api/v1` placeholder.
+`https://civicnewsroom.org/api/v1`
 
-## Available methods
+Use the apex domain. The `necivicnewsroom.up.railway.app` host works but is
+Railway's hostname for the service and isn't guaranteed to survive a platform
+change. `/api` is deliberately exempt from the `www` → apex redirect, because
+both curl and `requests` drop the `Authorization` header when a redirect changes
+host — an API call on the wrong hostname is served rather than turned into a
+confusing 401.
 
-`OPTIONS /meetings` returns `allow: GET, HEAD, OPTIONS, POST`.
+## externalId is what makes this safe
 
-**There is no PATCH, PUT, or DELETE.** A meeting cannot be corrected or removed
-through the API once submitted, which drives most of the caution below.
+Every meeting we submit carries an `externalId`: our own stable id for that
+meeting, unique per agency. This scraper uses `lnk-clip-{granicus clip_id}`.
 
-## How deduplication actually works
+With it, `POST /meetings` is an upsert keyed on that id:
 
-`GET /meetings` returns each record's `importFingerprint`, and its format is:
-
-```
-{agencyId}::{name, lowercased}::{dateTime as epoch milliseconds}
-```
-
-Observed value:
-
-```
-cmryg8k2p0001s91mclkzpdnq::lincoln city council regular meeting::1788215400000
-```
-
-Confirmed by experiment:
-
-| Change from a stored meeting | Result |
+| Resubmitted with | Response |
 |---|---|
-| nothing — identical repost | `200 {created: false, reason: "duplicate"}` |
-| different `dateTime`, same `name` | `201 created: true` |
-| same `dateTime`, different `name` | `201 created: true` |
+| nothing changed | `200 {created: false, reason: "duplicate"}` |
+| a new time, name, location or agenda URL | `200 {created: false, updated: true, changed: [...]}` — same record |
+| a first submission | `201 {created: true}` |
 
-So `agencyId`, `name` and `dateTime` are all part of the fingerprint, and
-`location`, `agendaUrl`, and `meetingType` are not.
+Verified end to end against ZZ Test Agency: create → repost → reschedule →
+rename leaves exactly one row holding the latest values.
 
-### Consequence 1 — meeting names are frozen
+**So the runner does no local deduplication at all.** It submits every scraped
+meeting and reports what the API says it did. The platform is the authority on
+what it already has, and its answer is more trustworthy than anything we could
+reconstruct locally.
 
-Because `name` is in the fingerprint, **changing a scraper's name strings
-re-creates every meeting it has ever submitted.** Names therefore live in a
-`TYPE_NAMES` constant per agency (one string per meeting type), never vary per
-meeting, and carry no date. Treat editing one as a data migration, not a tweak.
+Two consequences worth knowing:
 
-Case is safe to change — the fingerprint lowercases — but wording is not.
+- **Meeting names are free to change.** `TYPE_NAMES` in a scraper can be edited
+  without duplicating anything, because matching is on `externalId`, not name.
+- **`external_id` must stay stable for the life of a meeting.** It is the one
+  value a scraper must never let drift. Granicus puts `clip_id` in every link it
+  emits for a row — agenda, minutes, video — so the id survives a meeting being
+  rescheduled or renamed.
 
-### Consequence 2 — a rescheduled meeting would double up
+### Adoption: the first run with an externalId
 
-If Lincoln moves a meeting from 3:00 PM to 5:30 PM, the new time is a different
-fingerprint, so the API creates a second record and there is no endpoint to
-delete the stale one.
+Meetings submitted before `externalId` existed are matched on name + time and
+have the id attached, rather than being duplicated. The guide calls this
+`reason: "adopted"`; in practice the API returned `updated: true` with an empty
+`changed` array for our two records, and both kept their original record ids.
+Either way `created` stays 0, which is the signal that matters.
 
-Guarding against that is harder than it looks, because **`GET /meetings` returns
-only `id`, `name`, `dateTime`, `location` and `importFingerprint`** — no
-`agendaUrl`, and nothing carrying our own `clip_id`. There is no reliable way to
-recognize the same real-world meeting across a time change.
+Adoption depends on the scraper's names still producing exactly what was
+submitted before. Run the first pass against an agency with
+`--stop-on-unexpected-create`: a `created` where an adoption was expected means
+the names drifted and the run is about to duplicate everything.
 
-The runner therefore falls back to a heuristic: if a meeting with the same
-`name` already exists on the same Central-time date at a different time, it logs
-a warning, counts it as `time-changed`, and skips it. Skipping is the
-conservative choice given nothing can be deleted; the corrected time has to be
-entered by hand. `--allow-same-day` overrides it for a body that genuinely holds
-two same-type meetings in one day. See `existing_keys` in `scrapers/run.py`.
+## Required and optional fields
 
-Getting `agendaUrl` into the `GET /meetings` response would let us replace the
-heuristic with an exact match — see the open questions.
+Required: `name`, `dateTime`, `agencyId`.
 
-### Consequence 3 — pad the date window
+Everything else is optional, including `location` and `agendaUrl`. **A meeting
+can be submitted as soon as it is scheduled**, and a later run fills the agenda
+URL in when it is posted.
 
-`GET /meetings?from=&to=` appears to bound on midnight, so a query ending on the
-day of a meeting omits that meeting. The runner pads the range one day either
-side before building its key set.
+For Lincoln City Council this changes nothing observable: Granicus does not list
+a meeting in "Upcoming Events" before its agenda exists, so there is nothing to
+submit early. The lead time this buys is real for portals that publish a
+calendar ahead of agendas.
 
-## Field notes
-
-- `dateTime` accepts ISO 8601 with an offset and is stored as UTC — submitting
+- `dateTime` takes ISO 8601 with an offset and is stored as UTC —
   `2026-08-31T17:30:00-05:00` reads back as `2026-08-31T22:30:00.000Z`.
-- `agendaUrl` is **required**, so a scheduled meeting whose agenda has not been
-  posted yet cannot be submitted at all. Those are counted as
-  `skipped-no-agenda` and picked up by a later run.
-- Valid `meetingType` values: `REGULAR`, `SPECIAL`, `EMERGENCY`, `WORKSHOP`,
-  `HEARING`.
-- `GET /meetings` requires `agencyId`; without it the API returns `400`.
+- `meetingType` must be one of `REGULAR`, `SPECIAL`, `EMERGENCY`, `WORKSHOP`,
+  `HEARING`. An invalid value returns `400` (it used to fall back to `REGULAR`
+  silently). `Meeting` validates this before anything is sent.
+- `from` / `to` on `GET /meetings` accept bare `YYYY-MM-DD` and cover that whole
+  calendar day in America/Chicago, so no padding is needed.
+- `GET /meetings` requires `agencyId`, defaults to `limit=50`, and caps at 200.
+
+## Recovery
+
+`PATCH` and `DELETE` both exist on `/api/v1/meetings/{id}`:
+
+```bash
+# fix one field
+curl -X PATCH "https://civicnewsroom.org/api/v1/meetings/$ID" \
+  -H "Authorization: Bearer $PLATFORM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"agendaUrl": "https://..."}'
+
+# remove a bad record; frees its fingerprint for re-import
+curl -X DELETE "https://civicnewsroom.org/api/v1/meetings/$ID" \
+  -H "Authorization: Bearer $PLATFORM_API_KEY"
+```
+
+`PATCH` is partial — send only what changed. `agencyId` is immutable. `DELETE`
+refuses with `409 {assignmentCount}` when an editor has already attached an
+assignment, since those carry freelancer applications and payment records; a
+human has to clear them first.
+
+The runner never calls either. Both are for fixing things by hand.
+
+### The one case that needs a human: `conflict`
+
+A run reports `conflict` on a `409`, which means the payload's fingerprint
+belongs to a record filed under a *different* `externalId`. In practice that
+means a meeting's external id changed between runs — for this scraper, a row
+that had no `clip_id` to borrow on one run (so it got the `lnk-date-...`
+fallback) and gained one later. That has never been observed on Lincoln's
+portal, but if it happens: find the existing record, `PATCH` it with the correct
+values, and `DELETE` the stale one.
+
+## Rate limits
+
+None enforced; the platform asks for under ~60 requests a minute. The client
+throttles writes to one per second and leaves reads unthrottled. With no local
+pre-check a run POSTs every meeting in its window, so a full year for one agency
+takes about 30 seconds, and roughly 6–7 minutes once all 13 agencies exist.
 
 ## Agency ids
 
-Resolve agencies by id, never by name — the platform currently lists
-`"Omaha Streetcar Authoridy"`, and any name-matching code breaks the day that
-typo is fixed. Ids as of 2026-09-08:
+Resolve agencies by id, never by name. The `"Omaha Streetcar Authoridy"` typo
+was fixed on 2026-09-10 and the id did not change — which is exactly why
+id-matching was the right call. (Its public URL slug is still
+`omaha-streetcar-authoridy`, left alone so the existing link keeps working.)
 
 | Agency | id | Region |
 |---|---|---|
@@ -101,6 +144,7 @@ typo is fixed. Ids as of 2026-09-08:
 | Lincoln City Council | `cmryg8k2p0001s91mclkzpdnq` | Lincoln |
 | Lincoln Public Schools Board of Education | `cmrygddn60005s91mb1posjj9` | Lincoln |
 | Lincoln-Lancaster County Planning Commission | `cmrygfnxn0007s91mpsxoovti` | Lincoln |
+| ZZ Test Agency | `cmtvrv1xn0001lu1y1itrgs8y` | Lincoln |
 | Blackstone Business Improvement District | `cmryg1xyx0005qf1mf2sg6qjy` | Omaha |
 | Douglas County Board of Commissioners | `cmry22x9f0001pl1mh4733m2t` | Omaha |
 | Downtown Business Improvement District | `cmryfsmz00003qf1mleq7pvp4` | Omaha |
@@ -108,26 +152,19 @@ typo is fixed. Ids as of 2026-09-08:
 | Omaha Port Authority | `cmryfih4a0009pl1m9pf7zf1j` | Omaha |
 | Omaha Public Power District | `cmryfo71d0001qf1m109oj1uz` | Omaha |
 | Omaha Public Schools Board of Education | `cmryf502m0003pl1m3pqf52bt` | Omaha |
-| Omaha Streetcar Authoridy *(sic)* | `cmryf87zn0005pl1mxukk5dsl` | Omaha |
+| Omaha Streetcar Authority | `cmryf87zn0005pl1mxukk5dsl` | Omaha |
 | Sarpy County Board of Commissioners | `cmryfe0vv0007pl1ms6i9ijh0` | Omaha |
 
 Regenerate with `python3 -c "from scrapers.client import PlatformClient;
 print(PlatformClient().list_agencies())"`.
 
-## Open questions for Ben
+**ZZ Test Agency** is a live, normal agency used as a sandbox. Point
+`tools/verify_upsert.py` at it after any API change, and before the first real
+run of a new scraper.
 
-1. **Please delete the probe record** `cmttb83n20008qi1y51wyrj2b` — "Lincoln City
-   Council Regular Meeting (fingerprint probe)" on 2026-08-31. It exists only to
-   answer the `name`-in-fingerprint question and there is no delete endpoint.
-2. **Can `agendaUrl` become optional?** As it stands, a meeting can't enter the
-   system until its agenda is posted — often only days out, which is exactly the
-   lead time an editor needs to assign a reporter. Lincoln's Granicus "Upcoming
-   Events" table was empty on 2026-09-08, so the scraper had nothing to submit.
-3. **Is a PATCH or DELETE endpoint possible?** Without one, a rescheduled meeting
-   or a bad import can't be corrected by the scraper.
-4. **Could `GET /meetings` include `agendaUrl`?** It's the one stable identifier
-   we submit, and having it back would turn the rescheduled-meeting heuristic
-   above into an exact match.
-5. Is there a test agency we can probe against without putting junk in live data?
-6. Agency name typo: `"Omaha Streetcar Authoridy"` → `"Omaha Streetcar Authority"`.
-7. Any rate limits we should respect?
+## Open with Ben
+
+1. The guide documents adoption as `200 reason: "adopted"`, but our two
+   pre-`externalId` records came back as `updated: true` with an empty `changed`
+   array. Same outcome, and nothing duplicated — worth knowing which is
+   intended, since it's the signal a first run is checked against.
