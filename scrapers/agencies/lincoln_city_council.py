@@ -1,16 +1,27 @@
-"""Lincoln City Council -- Granicus portal.
+"""Lincoln City Council -- Granicus portal plus the city's meeting calendar.
 
-The portal has two kinds of table and this scraper reads both:
+Two sources, because neither alone covers what an editor needs.
 
-* "Upcoming Events" (Name | Date | Agenda | Packet) -- future meetings, the ones
-  reporters actually need to be assigned to. It is often empty; Lincoln only
-  publishes a meeting here once its agenda is posted, usually days ahead.
-* "Available Archives", one tab per year (Name | Date | Action | Minutes) --
-  meetings that have already happened.
+Granicus (lnklan.granicus.com) holds the agendas. Its "Upcoming Events" table
+lists a meeting only once its agenda is posted -- often not at all, days before
+the meeting -- and its "Available Archives" tabs hold everything past. On its
+own this scraper could see no future meetings whatsoever.
 
-Rows are keyed on the Granicus clip_id, which is unique per meeting, so two
-meetings on the same day (a pre-council session and a regular session, say)
-both survive.
+The city's own calendar page carries the schedule months ahead, in the same
+OpenCities format the planning commission uses. It has no agenda links, but the
+API does not require one, so a meeting goes in as soon as it is scheduled and
+gains its agenda on a later run once Granicus publishes it.
+
+Checked on 2026-09-10, the two agreed exactly: 30 shared dates, identical times,
+and the only calendar-extra entries were the five future meetings. Where both
+describe a meeting, Granicus wins -- it is the system the agenda hangs off --
+and a disagreement about the time is logged.
+
+Meetings are keyed on their date. Granicus offers a clip_id and the calendar
+does not, so keying on the clip would change a meeting's identity the moment it
+moved from one source to the other, which the platform would reject as a
+collision. Across 45 archived meetings no two shared a date; if that ever
+happens the second is skipped rather than silently overwriting the first.
 """
 
 import asyncio
@@ -23,13 +34,19 @@ from playwright.async_api import async_playwright
 
 from ..base import BaseScraper, ScraperError
 from ..meeting import CENTRAL, Meeting
+from ..sources import opencities
 
 log = logging.getLogger(__name__)
 
 GRANICUS_URL = "https://lnklan.granicus.com/ViewPublisher.php?view_id=2"
+CALENDAR_URL = (
+    "https://www.lincoln.ne.gov/City/City-Council/City-Council-Public-Meeting"
+)
 PLACE = (
     "Council Chambers, County/City Building, 555 South 10th Street, Lincoln 68508"
 )
+# Note the dots in "555 S. 10th Street" -- an address is not a sentence.
+LOCATION_RE = r"(Council Chambers, County/City Building.{0,120}?68508)"
 
 # How far either side of today to keep meetings. Backwards is short because the
 # assignment site cares about upcoming coverage, not history; override with
@@ -87,6 +104,26 @@ def classify(title: str) -> str:
     return "REGULAR"
 
 
+def external_id_for(day: date) -> str:
+    """The upsert key for a meeting on this date.
+
+    Deliberately the date alone. Granicus offers a clip_id and the city
+    calendar does not, so keying on the clip would change a meeting's identity
+    the moment it moved between sources -- which the platform rejects as a
+    collision. Meeting type is no good either: it is derived from the Granicus
+    row title, which the calendar has no equivalent of.
+    """
+    return f"lnk-{day.isoformat()}"
+
+
+def _clip_id(row) -> str | None:
+    """Granicus puts clip_id in every link it emits for a row."""
+    for link in row.find_all("a"):
+        if match := CLIP_ID_RE.search(link.get("href", "")):
+            return match.group(1)
+    return None
+
+
 def _absolute(href: str) -> str:
     if href.startswith("//"):
         return "https:" + href
@@ -99,9 +136,12 @@ class LincolnCityCouncil(BaseScraper):
     agency_name = "Lincoln City Council"
 
     def fetch(self) -> list[Meeting]:
-        return self.parse(asyncio.run(self._load_html()))
+        granicus_html, calendar_html = asyncio.run(self._load_html())
+        meetings = self.parse(granicus_html)
+        return self.merge_calendar(meetings, calendar_html)
 
-    async def _load_html(self) -> str:
+    async def _load_html(self) -> tuple[str, str]:
+        """Both sources in one browser session."""
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             try:
@@ -109,36 +149,63 @@ class LincolnCityCouncil(BaseScraper):
                 await page.goto(
                     GRANICUS_URL, wait_until="networkidle", timeout=60000
                 )
-                return await page.content()
+                granicus = await page.content()
+
+                # The city site never reaches networkidle, so wait for the
+                # document and give its scripts a moment to fill the list in.
+                await page.goto(
+                    CALENDAR_URL, wait_until="domcontentloaded", timeout=60000
+                )
+                await page.wait_for_timeout(4000)
+                return granicus, await page.content()
             finally:
                 await browser.close()
 
-    def _external_id(self, row, starts_at: datetime) -> str:
-        """A stable id for this meeting, for the API's upsert.
+    def merge_calendar(self, meetings: list[Meeting], html: str) -> list[Meeting]:
+        """Add scheduled meetings the calendar knows about and Granicus doesn't.
 
-        Granicus puts clip_id in every link it emits for a row -- agenda,
-        minutes, video -- so any one of them will do, and the id survives the
-        meeting being rescheduled or renamed.
-
-        A row with no links at all has no clip_id to borrow. That has never been
-        observed on this portal, so the date-based fallback is a backstop rather
-        than a code path to rely on: if the agenda later appears and brings a
-        clip_id with it, the id changes, and the next run gets a 409 rather than
-        quietly creating a second record.
+        Granicus wins where both describe a meeting: it is the system the agenda
+        hangs off. A disagreement about the time is logged rather than resolved,
+        since which source updates first after a reschedule is not yet known.
         """
-        for link in row.find_all("a"):
-            if match := CLIP_ID_RE.search(link.get("href", "")):
-                return f"lnk-clip-{match.group(1)}"
+        window = {m.starts_at.date(): m for m in meetings}
+        place = opencities.parse_location(html, LOCATION_RE) or PLACE
 
-        fallback = f"lnk-date-{starts_at.date().isoformat()}"
-        log.warning(
-            "No clip_id on the %s row; falling back to %r. If Granicus adds a "
-            "clip_id for this meeting later, expect a 409 that needs sorting "
-            "out by hand -- see docs/api-notes.md.",
-            starts_at.date().isoformat(),
-            fallback,
-        )
-        return fallback
+        for starts_at in opencities.parse_event_dates(html, CALENDAR_URL):
+            day = starts_at.date()
+            if not self._in_window(day):
+                continue
+
+            if existing := window.get(day):
+                if existing.starts_at != starts_at:
+                    log.info(
+                        "%s: Granicus says %s, the city calendar says %s; "
+                        "keeping Granicus",
+                        day.isoformat(),
+                        existing.starts_at.strftime("%-I:%M %p"),
+                        starts_at.strftime("%-I:%M %p"),
+                    )
+                continue
+
+            meeting = Meeting(
+                name=TYPE_NAMES["REGULAR"],
+                starts_at=starts_at,
+                external_id=external_id_for(day),
+                location=place,
+                agenda_url=None,  # Granicus publishes it closer to the day
+                meeting_type="REGULAR",
+            )
+            window[day] = meeting
+            meetings.append(meeting)
+
+        meetings.sort(key=lambda m: m.starts_at)
+        return meetings
+
+    def _in_window(self, day: date, today: date | None = None) -> bool:
+        today = today or datetime.now(CENTRAL).date()
+        earliest = self.since or today - timedelta(days=DAYS_BACK)
+        latest = self.until or today + timedelta(days=DAYS_FORWARD)
+        return earliest <= day <= latest
 
     def parse(
         self,
@@ -161,6 +228,7 @@ class LincolnCityCouncil(BaseScraper):
 
         meetings: list[Meeting] = []
         seen_clips: set[str] = set()
+        by_id: dict[str, Meeting] = {}
 
         for row in [tr for table in tables for tr in table.find_all("tr")]:
             cells = row.find_all("td")
@@ -184,22 +252,36 @@ class LincolnCityCouncil(BaseScraper):
                     agenda_href = _absolute(href)
                     break
 
-            external_id = self._external_id(row, starts_at)
-            if external_id in seen_clips:
+            clip_id = _clip_id(row)
+            if clip_id and clip_id in seen_clips:
                 continue  # a meeting can appear in both upcoming and archives
-            seen_clips.add(external_id)
+            if clip_id:
+                seen_clips.add(clip_id)
+
+            external_id = external_id_for(starts_at.date())
+            if external_id in by_id:
+                # Two meetings on one day. Unobserved across 45 archived
+                # meetings, but keying on the date cannot represent it, and
+                # overwriting the first silently would be worse than saying so.
+                self.skip(
+                    f"{starts_at.date()}: a second meeting at "
+                    f"{starts_at.strftime('%-I:%M %p')} shares the day with "
+                    f"{by_id[external_id].starts_at.strftime('%-I:%M %p')}, and "
+                    "this source identifies meetings only by date"
+                )
+                continue
 
             meeting_type = classify(" ".join(cells[0].get_text().split()))
-            meetings.append(
-                Meeting(
-                    name=TYPE_NAMES[meeting_type],
-                    starts_at=starts_at,
-                    external_id=external_id,
-                    location=PLACE,
-                    agenda_url=agenda_href or None,
-                    meeting_type=meeting_type,
-                )
+            meeting = Meeting(
+                name=TYPE_NAMES[meeting_type],
+                starts_at=starts_at,
+                external_id=external_id,
+                location=PLACE,
+                agenda_url=agenda_href or None,
+                meeting_type=meeting_type,
             )
+            meetings.append(meeting)
+            by_id[external_id] = meeting
 
         meetings.sort(key=lambda m: m.starts_at)
         return meetings

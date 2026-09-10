@@ -45,6 +45,7 @@ from playwright.async_api import async_playwright
 
 from ..base import BaseScraper, ScraperError
 from ..meeting import CENTRAL, Meeting
+from ..sources import opencities
 
 log = logging.getLogger(__name__)
 
@@ -70,39 +71,13 @@ MEETING_NAME = "Lincoln-Lancaster County Planning Commission Regular Meeting"
 
 # agenda-packets/2026/20260916.pdf -- the file is named for the meeting date.
 AGENDA_RE = re.compile(r"/agenda-packets/\d{4}/(\d{4})(\d{2})(\d{2})\.pdf", re.I)
+# Note the dots in "555 S. 10th Street" -- an address is not a sentence.
+LOCATION_RE = r"(County/City Building.{0,140}?68508)"
 
 
 def parse_calendar(html: str) -> list[datetime]:
-    """Every meeting start time on the calendar page.
-
-    Read from the list item's data attributes rather than its text: the text is
-    a formatted range ("Wednesday, September 16, 2026 | 01:00 PM - 04:30 PM")
-    while the attributes are already split into numbers.
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    items = soup.select("li.multi-date-item")
-    if not items:
-        raise ScraperError(
-            f"No meeting dates found at {CALENDAR_URL} -- the page layout has "
-            "probably changed."
-        )
-
-    starts = []
-    for item in items:
-        try:
-            starts.append(
-                datetime(
-                    int(item["data-start-year"]),
-                    int(item["data-start-month"]),
-                    int(item["data-start-day"]),
-                    int(item["data-start-hour"]),
-                    int(item["data-start-mins"]),
-                    tzinfo=CENTRAL,
-                )
-            )
-        except (KeyError, ValueError) as exc:
-            log.debug("skipping a calendar entry we could not read: %s", exc)
-    return sorted(set(starts))
+    """Every meeting start time on the calendar page."""
+    return opencities.parse_event_dates(html, CALENDAR_URL)
 
 
 def parse_agenda_links(html: str) -> dict[date, str]:
@@ -122,13 +97,7 @@ def parse_agenda_links(html: str) -> dict[date, str]:
 
 def parse_location(html: str) -> str | None:
     """The address block on the calendar page, if it is still where it was."""
-    soup = BeautifulSoup(html, "html.parser")
-    text = " ".join(soup.get_text().split())
-    # Note the dots in "555 S. 10th Street" -- an address is not a sentence.
-    match = re.search(r"(County/City Building.{0,140}?68508)", text, re.I)
-    if not match:
-        return None
-    return " ".join(match.group(1).split()).strip(" ,")
+    return opencities.parse_location(html, LOCATION_RE)
 
 
 class PlanningCommission(BaseScraper):
