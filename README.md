@@ -11,14 +11,15 @@ Currently implemented:
 |---|---|---|
 | Lincoln City Council | `lincoln_city_council` | Granicus portal + city meeting calendar |
 | Lancaster County Board of Commissioners | `lancaster_county_commissioners` | CivicPlus Agenda Center + agenda PDFs + iCalendar feed |
-| Lincoln Public Schools Board of Education | `lps_board_of_education` | SPARQ Data portal |
+| Lincoln Public Schools Board of Education | `lps_board_of_education` | SPARQ Data portal + district calendar API |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | lincoln.ne.gov calendar + landing page |
 
-Every agency except LPS now publishes a forward schedule somewhere separate
-from its agendas — two OpenCities calendar pages on lincoln.ne.gov and an
-iCalendar feed for the county. Granicus, the Agenda Center and SPARQ each list a
-meeting only once its agenda is posted, so each of those scrapers reads a
-second source for the meetings still to come.
+All four Lincoln agencies now publish a forward schedule somewhere separate
+from their agendas — two OpenCities calendar pages on lincoln.ne.gov, an
+iCalendar feed for the county, and a Thrillshare events API for the school
+district. Granicus, the Agenda Center and SPARQ each list a meeting only once
+its agenda is posted, so each of those scrapers reads a second source for the
+meetings still to come.
 
 ## Setup
 

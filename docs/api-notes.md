@@ -29,7 +29,7 @@ confusing 401.
 ## externalId is what makes this safe
 
 Every meeting we submit carries an `externalId`: our own stable id for that
-meeting, unique per agency. This scraper uses `lnk-clip-{granicus clip_id}`.
+meeting, unique per agency.
 
 With it, `POST /meetings` is an upsert keyed on that id:
 
@@ -52,9 +52,26 @@ Two consequences worth knowing:
 - **Meeting names are free to change.** `TYPE_NAMES` in a scraper can be edited
   without duplicating anything, because matching is on `externalId`, not name.
 - **`external_id` must stay stable for the life of a meeting.** It is the one
-  value a scraper must never let drift. Granicus puts `clip_id` in every link it
-  emits for a row — agenda, minutes, video — so the id survives a meeting being
-  rescheduled or renamed.
+  value a scraper must never let drift.
+
+### Choosing an externalId
+
+Every agency here reads two sources — one with the agendas, one with the
+forward schedule — so the id has to be something *both* sources can produce. A
+source's own meeting id is therefore the wrong choice, however stable it looks:
+the record would change identity the moment the meeting moved from the calendar
+to the agenda system, orphaning the first copy. Each scheme below is the
+narrowest key the two sources agree on.
+
+| Agency | Scheme | Why not narrower |
+|---|---|---|
+| Lincoln City Council | `lnk-{date}` | No two of 45 archived meetings shared a date |
+| Lancaster County | `lnc-{series}-{date}` | Two series meet the same morning |
+| LPS Board of Education | `lps-{date}-{HHMM}` | 170 of 489 dates carry more than one meeting |
+| Planning Commission | `llcpc-{date}` | One meeting per date |
+
+Where a scheme cannot represent two meetings that collide, the scraper skips
+the second with a warning rather than silently overwriting the first.
 
 ### Adoption: the first run with an externalId
 

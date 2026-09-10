@@ -1,0 +1,320 @@
+{
+ "events": [
+  {
+   "id": 58553666,
+   "title": "Lincoln Board of Education and ESU18 Regular Meetings",
+   "start_at": "2026-09-22T18:00:00.000-05:00",
+   "end_at": "2026-09-22T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": false,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p>The Lincoln Board of Education and Educational Service Unit #18 will hold regular meetings on Tuesday, Sept. 22, 2026, located in the Boardroom at Lincoln Public Schools Steve J",
+   "recurrency": null
+  },
+  {
+   "id": 58553682,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2026-10-13T18:00:00.000-05:00",
+   "end_at": "2026-10-13T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p><span>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O St",
+   "recurrency": {
+    "id": 59101,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553677,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2026-10-27T18:00:00.000-05:00",
+   "end_at": "2026-10-27T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center- 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center- 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p><span>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O St",
+   "recurrency": {
+    "id": 59102,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553683,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2026-11-10T18:00:00.000-06:00",
+   "end_at": "2026-11-10T19:00:00.000-06:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p><span>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O St",
+   "recurrency": {
+    "id": 59101,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553678,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2026-11-24T18:00:00.000-06:00",
+   "end_at": "2026-11-24T19:00:00.000-06:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center- 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center- 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p><span>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O St",
+   "recurrency": {
+    "id": 59102,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553684,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2026-12-08T18:00:00.000-06:00",
+   "end_at": "2026-12-08T19:00:00.000-06:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p><span>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O St",
+   "recurrency": {
+    "id": 59101,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553685,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2027-01-12T18:00:00.000-06:00",
+   "end_at": "2027-01-12T19:00:00.000-06:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p><span>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O St",
+   "recurrency": {
+    "id": 59101,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553679,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2027-01-26T18:00:00.000-06:00",
+   "end_at": "2027-01-26T19:00:00.000-06:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O Street. ",
+   "recurrency": {
+    "id": 59103,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553686,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2027-02-09T18:00:00.000-06:00",
+   "end_at": "2027-02-09T19:00:00.000-06:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p><span>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O St",
+   "recurrency": {
+    "id": 59101,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553680,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2027-02-23T18:00:00.000-06:00",
+   "end_at": "2027-02-23T19:00:00.000-06:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O Street. ",
+   "recurrency": {
+    "id": 59103,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553681,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2027-03-23T18:00:00.000-05:00",
+   "end_at": "2027-03-23T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": true,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p>The Lincoln Board of Education will hold a regular meeting on Tuesday,  located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, 5905 O Street. ",
+   "recurrency": {
+    "id": 59103,
+    "frequency": "monthly"
+   }
+  },
+  {
+   "id": 58553688,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2027-04-13T18:00:00.000-05:00",
+   "end_at": "2027-04-13T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": false,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p>The Lincoln Board of Education will hold a regular meeting on Tuesday, April 13, 2027, located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Center, ",
+   "recurrency": null
+  },
+  {
+   "id": 58553709,
+   "title": "Lincoln Board of Education and ESU18 Regular Meetings",
+   "start_at": "2027-04-27T18:00:00.000-05:00",
+   "end_at": "2027-04-27T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Boardroom at Lincoln Public Schools Steve Joel District Leadership Center - 5905 E O St, Lincoln, NE 68510, USA",
+   "address": "Boardroom at Lincoln Public Schools Steve Joel District Leadership Center - 5905 E O St, Lincoln, NE 68510, USA",
+   "recurrent": false,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p>The Lincoln Board of Education and Educational Service Unit #18 will hold regular meetings on Tuesday, April 27, 2027, located in the Boardroom at Lincoln Public Schools Steve J",
+   "recurrency": null
+  },
+  {
+   "id": 58553730,
+   "title": "Lincoln Board of Education and ESU18 Regular Meetings",
+   "start_at": "2027-05-11T18:00:00.000-05:00",
+   "end_at": "2027-05-11T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Boardroom at Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Boardroom at Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": false,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p><span>The Lincoln Board of Education and Educational Service Unit #18 will hold regular meetings on Tuesday, May 11, 2027, located in the Boardroom at Lincoln Public Schools Ste",
+   "recurrency": null
+  },
+  {
+   "id": 58553765,
+   "title": "Lincoln Board of Education and ESU 18 Organization Special Meetings",
+   "start_at": "2027-05-17T18:00:00.000-05:00",
+   "end_at": "2027-05-17T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Boardroom at the Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Boardroom at the Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": false,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p>The Lincoln Board of Education and Education Service Unit (ESU) 18 will hold special meetings on Monday, May 17, at 6:00 p.m. located in the Boardroom at the Lincoln Public Scho",
+   "recurrency": null
+  },
+  {
+   "id": 58553749,
+   "title": "Lincoln Board of Education Regular Meeting",
+   "start_at": "2027-05-25T18:00:00.000-05:00",
+   "end_at": "2027-05-25T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Boardroom at Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "address": "Boardroom at Lincoln Public Schools Steve Joel District Leadership Center - 5905 O St, Lincoln, NE 68510, USA",
+   "recurrent": false,
+   "custom_section_name": "Board of Education Calendar",
+   "custom_section_id": 541015,
+   "description": "<p><span>The Lincoln Board of Education will hold a regular meeting on Tuesday, May 25, 2027, located in the Boardroom at Lincoln Public Schools Steve Joel District Leadership Cent",
+   "recurrency": null
+  },
+  {
+   "id": 51803996,
+   "title": "Last day of 1st quarter",
+   "start_at": "2026-10-14T00:00:00.000-05:00",
+   "end_at": "2026-10-14T00:00:00.000-05:00",
+   "all_day": true,
+   "venue": "",
+   "address": "",
+   "recurrent": false,
+   "custom_section_name": "Academic Calendar",
+   "custom_section_id": 528582,
+   "description": "",
+   "recurrency": null
+  },
+  {
+   "id": 51804005,
+   "title": "LPS quarter break",
+   "start_at": "2026-10-15T00:00:00.000-05:00",
+   "end_at": "2026-10-16T00:00:00.000-05:00",
+   "all_day": true,
+   "venue": "",
+   "address": "",
+   "recurrent": false,
+   "custom_section_name": "Academic Calendar",
+   "custom_section_id": 528582,
+   "description": "",
+   "recurrency": null
+  },
+  {
+   "id": 58554188,
+   "title": "Yankee Hill Education Center Graduation Celebration",
+   "start_at": "2027-05-18T18:00:00.000-05:00",
+   "end_at": "2027-05-18T19:00:00.000-05:00",
+   "all_day": false,
+   "venue": "Lincoln East High School, 1000 S 70th St, Lincoln, NE 68510, USA",
+   "address": "Lincoln East High School, 1000 S 70th St, Lincoln, NE 68510, USA",
+   "recurrent": false,
+   "custom_section_name": "Academic Calendar",
+   "custom_section_id": 528582,
+   "description": "<a href=\"https://www.lps.org/page/graduation-information\">https://www.lps.org/page/graduation-information</a>",
+   "recurrency": null
+  }
+ ],
+ "meta": {
+  "links": {
+   "first": "https://lincolnpublicschools.thrillshare.com/api/v4/o/31429/cms/events?locale=en&page_no=1",
+   "last": "https://lincolnpublicschools.thrillshare.com/api/v4/o/31429/cms/events?locale=en&page_no=1",
+   "next": null,
+   "total_entries": 19
+  },
+  "sections": [
+   {
+    "id": 528582,
+    "name": "Academic Calendar",
+    "slug": "academic-calendar-lps"
+   },
+   {
+    "id": 541015,
+    "name": "Board of Education Calendar",
+    "slug": "board-of-education-calendar-lps"
+   }
+  ]
+ }
+}
