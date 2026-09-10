@@ -1,0 +1,92 @@
+BEGIN:VCALENDAR
+PRODID:iCalendar-Ruby
+VERSION:2.0
+X-WR-TIMEZONE:America/Chicago
+BEGIN:VEVENT
+DESCRIPTION: https://www.lancaster.ne.gov/calendar.aspx?EID=2138
+DTEND;TZID=America/Chicago:20260929T235900
+DTSTAMP;TZID=America/Chicago:20260113T160720
+DTSTART;TZID=America/Chicago:20260929T090000
+LAST-MODIFIED;TZID=America/Chicago:20260113T160720
+LOCATION: -   Lincoln NE 68502
+SEQUENCE:0
+SUMMARY:Board of Commissioners Meeting 
+UID:2138
+URL:/common/modules/iCalendar/iCalendar.aspx?feed=calendar&catID=14
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION: https://www.lancaster.ne.gov/calendar.aspx?EID=2142
+DTEND;TZID=America/Chicago:20261027T235900
+DTSTAMP;TZID=America/Chicago:20260113T160720
+DTSTART;TZID=America/Chicago:20261027T090000
+LAST-MODIFIED;TZID=America/Chicago:20260113T160720
+LOCATION: -   Lincoln NE 68502
+SEQUENCE:0
+SUMMARY:Board of Commissioners Meeting 
+UID:2142
+URL:/common/modules/iCalendar/iCalendar.aspx?feed=calendar&catID=14
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION: https://www.lancaster.ne.gov/calendar.aspx?EID=2171
+DTEND;TZID=America/Chicago:20260915T235900
+DTSTAMP;TZID=America/Chicago:20260113T160806
+DTSTART;TZID=America/Chicago:20260915T090000
+LAST-MODIFIED;TZID=America/Chicago:20260113T160806
+LOCATION: -   Lincoln NE 68502
+SEQUENCE:0
+SUMMARY:Board of Equalization 
+UID:2171
+URL:/common/modules/iCalendar/iCalendar.aspx?feed=calendar&catID=14
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION: https://www.lancaster.ne.gov/calendar.aspx?EID=1911
+DTEND;VALUE=DATE:20260924
+DTSTAMP;TZID=America/Chicago:20260105T152139
+DTSTART;VALUE=DATE:20260924
+LAST-MODIFIED;TZID=America/Chicago:20260105T152139
+LOCATION: -   Lincoln NE 68502
+SEQUENCE:0
+SUMMARY:Board of Commissioners Staff Meeting
+UID:1911
+URL:/common/modules/iCalendar/iCalendar.aspx?feed=calendar&catID=14
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION: https://www.lancaster.ne.gov/calendar.aspx?EID=1608
+DTEND;TZID=America/Chicago:20270413T143000
+DTSTAMP;TZID=America/Chicago:20250307T153059
+DTSTART;TZID=America/Chicago:20270413T133000
+LAST-MODIFIED;TZID=America/Chicago:20250307T153059
+LOCATION: - 555 South 10th Street Bill Luxford Studio - Room 113 Lincoln NE
+  68508
+SEQUENCE:0
+SUMMARY:Public Building Commission Meeting
+UID:1608
+URL:/common/modules/iCalendar/iCalendar.aspx?feed=calendar&catID=14
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:All offices will be closed. https://www.lancaster.ne.gov/calend
+ ar.aspx?EID=194
+DTEND;VALUE=DATE:20491225
+DTSTAMP;TZID=America/Chicago:20181205T110002
+DTSTART;VALUE=DATE:20491225
+LAST-MODIFIED;TZID=America/Chicago:20181205T110002
+LOCATION: -   Manhattan KS 66502
+SEQUENCE:0
+SUMMARY:Christmas Day
+UID:194
+URL:/common/modules/iCalendar/iCalendar.aspx?feed=calendar&catID=14
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:A regular meeting held by the Board of Commissioners https://ww
+ w.lancaster.ne.gov/calendar.aspx?EID=565
+DTEND;TZID=America/Chicago:20191203T235900
+DTSTAMP;TZID=America/Chicago:20191127T120315
+DTSTART;TZID=America/Chicago:20191203T090000
+LAST-MODIFIED;TZID=America/Chicago:20191127T120315
+LOCATION: - 555 S. 10th St. Room 112 Lincoln NE 68508
+SEQUENCE:0
+SUMMARY:Board of Commissioners Meeting
+UID:565
+URL:/common/modules/iCalendar/iCalendar.aspx?feed=calendar&catID=14
+END:VEVENT
+END:VCALENDAR
