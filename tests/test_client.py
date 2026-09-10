@@ -1,12 +1,18 @@
 import json
-from datetime import UTC, date, datetime
+from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest
 
-from scrapers.client import AuthError, PlatformClient, PlatformError
+from scrapers.client import (
+    AuthError,
+    CollisionError,
+    PlatformClient,
+    PlatformError,
+    SubmitResult,
+)
 from scrapers.meeting import CENTRAL, Meeting
-from scrapers.run import existing_keys, fingerprint_key, name_date_key
+from scrapers.run import UnexpectedCreate, submit
 
 AGENCY = "cmryg8k2p0001s91mclkzpdnq"
 
@@ -15,6 +21,7 @@ def make_meeting(**kwargs):
     defaults = dict(
         name="Lincoln City Council Regular Meeting",
         starts_at=datetime(2026, 8, 31, 17, 30, tzinfo=CENTRAL),
+        external_id="lnk-clip-426",
         location="Council Chambers",
         agenda_url="https://lnklan.granicus.com/AgendaViewer.php?clip_id=426",
     )
@@ -34,19 +41,32 @@ def fake_response(status, body=None):
     return response
 
 
+class FakeScraper:
+    agency_id = AGENCY
+    slug = "fake"
+
+
 # --- Meeting -----------------------------------------------------------------
 
 
-def test_payload_has_every_required_api_field():
-    payload = make_meeting().to_payload(AGENCY)
-    assert payload == {
+def test_payload_has_every_field_the_api_expects():
+    assert make_meeting().to_payload(AGENCY) == {
         "name": "Lincoln City Council Regular Meeting",
         "dateTime": "2026-08-31T17:30:00-05:00",
         "agencyId": AGENCY,
+        "externalId": "lnk-clip-426",
         "location": "Council Chambers",
         "agendaUrl": "https://lnklan.granicus.com/AgendaViewer.php?clip_id=426",
         "meetingType": "REGULAR",
     }
+
+
+def test_a_meeting_with_no_agenda_yet_is_still_submittable():
+    """Only name, dateTime and agencyId are required, so a meeting can go in as
+    soon as it is scheduled and gain its agenda URL on a later run."""
+    payload = make_meeting(agenda_url=None).to_payload(AGENCY)
+    assert "agendaUrl" not in payload
+    assert payload["dateTime"] and payload["name"] and payload["agencyId"]
 
 
 def test_optional_fields_are_omitted_when_empty():
@@ -54,14 +74,7 @@ def test_optional_fields_are_omitted_when_empty():
     assert make_meeting(details="Budget").to_payload(AGENCY)["details"] == "Budget"
 
 
-def test_fingerprint_matches_the_value_the_api_returned():
-    """Observed live on 2026-09-08; see docs/api-notes.md."""
-    assert make_meeting().fingerprint(AGENCY) == (
-        f"{AGENCY}::lincoln city council regular meeting::1788215400000"
-    )
-
-
-def test_invalid_meeting_type_is_rejected():
+def test_invalid_meeting_type_is_rejected_before_it_reaches_the_api():
     with pytest.raises(ValueError, match="meeting_type"):
         make_meeting(meeting_type="ANNUAL")
 
@@ -71,9 +84,26 @@ def test_naive_datetime_is_rejected():
         make_meeting(starts_at=datetime(2026, 8, 31, 17, 30))
 
 
-def test_empty_agenda_url_is_rejected():
-    with pytest.raises(ValueError, match="agenda_url"):
-        make_meeting(agenda_url="")
+def test_external_id_is_required():
+    with pytest.raises(ValueError, match="external_id"):
+        make_meeting(external_id="")
+
+
+# --- SubmitResult ------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "kwargs,expected",
+    [
+        ({"created": True}, "created"),
+        ({"created": False, "reason": "adopted"}, "adopted"),
+        ({"created": False, "updated": True, "changed": ["dateTime"]}, "updated"),
+        ({"created": False, "reason": "duplicate"}, "duplicate"),
+        ({"created": False}, "duplicate"),
+    ],
+)
+def test_outcome_reads_every_documented_response_shape(kwargs, expected):
+    assert SubmitResult(id="x", **kwargs).outcome == expected
 
 
 # --- PlatformClient ----------------------------------------------------------
@@ -86,36 +116,62 @@ def test_missing_key_fails_with_a_useful_message(monkeypatch):
             PlatformClient()
 
 
-def test_201_counts_as_created():
+def test_201_is_a_create():
     client = make_client()
-    with patch.object(
-        client.session, "request", return_value=fake_response(201, {"id": "x", "created": True})
-    ):
-        result = client.create_meeting({})
-    assert (result.created, result.id) == (True, "x")
+    body = {"id": "x", "created": True}
+    with patch.object(client.session, "request", return_value=fake_response(201, body)):
+        assert client.submit_meeting({}).outcome == "created"
 
 
-def test_200_with_created_false_is_a_duplicate_not_an_error():
+def test_200_updated_carries_the_changed_fields():
     client = make_client()
-    body = {"id": "x", "created": False, "reason": "duplicate"}
+    body = {"id": "x", "created": False, "updated": True, "changed": ["dateTime"]}
     with patch.object(client.session, "request", return_value=fake_response(200, body)):
-        result = client.create_meeting({})
-    assert result.created is False
-    assert result.reason == "duplicate"
+        result = client.submit_meeting({})
+    assert result.outcome == "updated"
+    assert result.changed == ["dateTime"]
+
+
+def test_200_adopted_is_reported_as_such():
+    client = make_client()
+    body = {"id": "x", "created": False, "reason": "adopted"}
+    with patch.object(client.session, "request", return_value=fake_response(200, body)):
+        assert client.submit_meeting({}).outcome == "adopted"
+
+
+def test_409_raises_a_collision_naming_the_external_id():
+    client = make_client()
+    with patch.object(client.session, "request", return_value=fake_response(409)):
+        with pytest.raises(CollisionError, match="lnk-clip-426"):
+            client.submit_meeting({"externalId": "lnk-clip-426"})
 
 
 def test_401_raises_auth_error():
     client = make_client()
     with patch.object(client.session, "request", return_value=fake_response(401)):
         with pytest.raises(AuthError):
-            client.create_meeting({})
+            client.submit_meeting({})
 
 
 def test_unexpected_status_raises():
     client = make_client()
     with patch.object(client.session, "request", return_value=fake_response(422)):
         with pytest.raises(PlatformError, match="422"):
-            client.create_meeting({})
+            client.submit_meeting({})
+
+
+def test_delete_returns_false_when_an_assignment_blocks_it():
+    client = make_client()
+    body = {"assignmentCount": 2}
+    with patch.object(client.session, "request", return_value=fake_response(409, body)):
+        assert client.delete_meeting("x") is False
+
+
+def test_delete_succeeds():
+    client = make_client()
+    body = {"deleted": True}
+    with patch.object(client.session, "request", return_value=fake_response(200, body)):
+        assert client.delete_meeting("x") is True
 
 
 def test_get_agency_matches_on_id_not_name():
@@ -126,85 +182,83 @@ def test_get_agency_matches_on_id_not_name():
         assert client.get_agency("nope") is None
 
 
-# --- dedup -------------------------------------------------------------------
+def test_reads_are_not_throttled():
+    """The courtesy rate limit is for writes; a run's GETs shouldn't pay it."""
+    client = make_client()
+    with patch.object(client, "_throttle") as throttle:
+        with patch.object(
+            client.session, "request", return_value=fake_response(200, [])
+        ):
+            client.list_agencies()
+    throttle.assert_not_called()
 
 
-class FakeScraper:
-    agency_id = AGENCY
+def test_writes_are_throttled():
+    client = make_client()
+    with patch.object(client, "_throttle") as throttle:
+        with patch.object(
+            client.session, "request", return_value=fake_response(201, {"id": "x"})
+        ):
+            client.submit_meeting({})
+    throttle.assert_called_once()
 
 
-def as_stored(meeting):
-    """A record shaped the way GET /meetings really answers.
-
-    Captured live 2026-09-08: no agendaUrl, no source id -- name, dateTime,
-    location and importFingerprint are all we get back.
-    """
-    return {
-        "id": "cm_stored",
-        "name": meeting.name,
-        "dateTime": meeting.starts_at.astimezone(UTC).isoformat().replace(
-            "+00:00", "Z"
-        ),
-        "location": meeting.location,
-        "importFingerprint": meeting.fingerprint(AGENCY),
-    }
+# --- submit ------------------------------------------------------------------
 
 
-def keys_for(client, meetings, stored):
-    with patch.object(client, "list_meetings", return_value=stored):
-        return existing_keys(client, FakeScraper(), meetings)
+def submit_with(outcomes, **kwargs):
+    """Run submit() over N meetings, with the API returning `outcomes` in turn."""
+    client = make_client()
+    meetings = [
+        make_meeting(external_id=f"lnk-clip-{i}") for i in range(len(outcomes))
+    ]
+    with patch.object(client, "submit_meeting", side_effect=outcomes):
+        return submit(client, FakeScraper(), meetings, dry_run=False, **kwargs)
 
 
-def test_existing_fingerprint_blocks_a_repost():
-    meeting = make_meeting()
-    known = keys_for(make_client(), [meeting], [as_stored(meeting)])
-    assert fingerprint_key(meeting, AGENCY) in known
-
-
-def test_rescheduled_meeting_is_caught_by_name_and_date():
-    """A new time is a new fingerprint, so the API would create a second record
-    and there is no endpoint to delete it. Only name + date can catch this --
-    the response carries nothing else that identifies the same meeting."""
-    stored = make_meeting()
-    moved = make_meeting(starts_at=datetime(2026, 8, 31, 19, 0, tzinfo=CENTRAL))
-    assert moved.fingerprint(AGENCY) != stored.fingerprint(AGENCY)
-
-    known = keys_for(make_client(), [moved], [as_stored(stored)])
-    assert fingerprint_key(moved, AGENCY) not in known
-    assert name_date_key(moved.name, moved.starts_at.date()) in known
-
-
-def test_stored_utc_times_map_back_to_the_central_date():
-    """A 5:30 PM Central meeting is stored as 22:30 UTC -- same calendar day.
-    An 8:00 PM one is stored as 01:00 UTC the next day, and must not be read as
-    belonging to that next day."""
-    late = make_meeting(starts_at=datetime(2026, 8, 31, 20, 0, tzinfo=CENTRAL))
-    stored = as_stored(late)
-    assert stored["dateTime"].startswith("2026-09-01T01:00")
-
-    known = keys_for(make_client(), [late], [stored])
-    assert name_date_key(late.name, date(2026, 8, 31)) in known
-    assert name_date_key(late.name, date(2026, 9, 1)) not in known
-
-
-def test_a_genuinely_new_meeting_is_not_flagged():
-    new = make_meeting(
-        starts_at=datetime(2026, 9, 14, 15, 0, tzinfo=CENTRAL),
-        agenda_url="https://lnklan.granicus.com/AgendaViewer.php?clip_id=430",
+def test_counts_every_outcome_separately():
+    counts = submit_with(
+        [
+            SubmitResult(id="a", created=True),
+            SubmitResult(id="b", created=False, reason="adopted"),
+            SubmitResult(id="c", created=False, updated=True, changed=["dateTime"]),
+            SubmitResult(id="d", created=False, reason="duplicate"),
+        ]
     )
-    known = keys_for(make_client(), [new], [as_stored(make_meeting())])
-    assert fingerprint_key(new, AGENCY) not in known
-    assert name_date_key(new.name, new.starts_at.date()) not in known
+    assert counts["created"] == 1
+    assert counts["adopted"] == 1
+    assert counts["updated"] == 1
+    assert counts["duplicate"] == 1
+    assert counts["failed"] == 0
 
 
-def test_same_day_meetings_of_different_types_do_not_collide():
-    """Pre-council at 1:00 and the regular session at 3:00 have different names,
-    so the name+date guard leaves both alone."""
-    regular = make_meeting(starts_at=datetime(2026, 9, 14, 15, 0, tzinfo=CENTRAL))
-    workshop = make_meeting(
-        name="Lincoln City Council Work Session",
-        meeting_type="WORKSHOP",
-        starts_at=datetime(2026, 9, 14, 13, 0, tzinfo=CENTRAL),
+def test_a_collision_is_counted_apart_from_a_failure():
+    counts = submit_with([CollisionError("409 for lnk-clip-0")])
+    assert counts["conflict"] == 1
+    assert counts["failed"] == 0
+
+
+def test_other_errors_count_as_failures_without_stopping_the_run():
+    counts = submit_with(
+        [PlatformError("boom"), SubmitResult(id="b", created=True)]
     )
-    known = keys_for(make_client(), [workshop], [as_stored(regular)])
-    assert name_date_key(workshop.name, workshop.starts_at.date()) not in known
+    assert counts["failed"] == 1
+    assert counts["created"] == 1
+
+
+def test_stop_on_unexpected_create_aborts_the_run():
+    """The guard for a first run against an agency that already has meetings:
+    they should be adopted, and a create means the run is about to duplicate."""
+    with pytest.raises(UnexpectedCreate, match="created rather than adopted"):
+        submit_with(
+            [SubmitResult(id="a", created=True), SubmitResult(id="b", created=True)],
+            stop_on_unexpected_create=True,
+        )
+
+
+def test_dry_run_never_calls_the_api():
+    client = make_client()
+    with patch.object(client, "submit_meeting") as api:
+        counts = submit(client, FakeScraper(), [make_meeting()], dry_run=True)
+    api.assert_not_called()
+    assert counts["created"] == 1

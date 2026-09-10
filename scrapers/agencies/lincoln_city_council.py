@@ -14,6 +14,7 @@ both survive.
 """
 
 import asyncio
+import logging
 import re
 from datetime import date, datetime, timedelta
 
@@ -22,6 +23,8 @@ from playwright.async_api import async_playwright
 
 from ..base import BaseScraper, ScraperError
 from ..meeting import CENTRAL, Meeting
+
+log = logging.getLogger(__name__)
 
 GRANICUS_URL = "https://lnklan.granicus.com/ViewPublisher.php?view_id=2"
 PLACE = (
@@ -39,9 +42,8 @@ DATE_TIME_RE = re.compile(
 )
 CLIP_ID_RE = re.compile(r"clip_id=(\d+)")
 
-# Meeting names are constant per (agency, meeting type) -- the date lives only in
-# dateTime. Changing these strings risks duplicating every meeting if the API's
-# importFingerprint covers `name`; see docs/api-notes.md.
+# One name per meeting type. Editing these is safe -- the API upserts on
+# externalId, so a renamed meeting updates its record rather than doubling up.
 TYPE_NAMES = {
     "REGULAR": "Lincoln City Council Regular Meeting",
     "SPECIAL": "Lincoln City Council Special Meeting",
@@ -111,6 +113,33 @@ class LincolnCityCouncil(BaseScraper):
             finally:
                 await browser.close()
 
+    def _external_id(self, row, starts_at: datetime) -> str:
+        """A stable id for this meeting, for the API's upsert.
+
+        Granicus puts clip_id in every link it emits for a row -- agenda,
+        minutes, video -- so any one of them will do, and the id survives the
+        meeting being rescheduled or renamed.
+
+        A row with no links at all has no clip_id to borrow. That has never been
+        observed on this portal, so the date-based fallback is a backstop rather
+        than a code path to rely on: if the agenda later appears and brings a
+        clip_id with it, the id changes, and the next run gets a 409 rather than
+        quietly creating a second record.
+        """
+        for link in row.find_all("a"):
+            if match := CLIP_ID_RE.search(link.get("href", "")):
+                return f"lnk-clip-{match.group(1)}"
+
+        fallback = f"lnk-date-{starts_at.date().isoformat()}"
+        log.warning(
+            "No clip_id on the %s row; falling back to %r. If Granicus adds a "
+            "clip_id for this meeting later, expect a 409 that needs sorting "
+            "out by hand -- see docs/api-notes.md.",
+            starts_at.date().isoformat(),
+            fallback,
+        )
+        return fallback
+
     def parse(
         self,
         html: str,
@@ -144,8 +173,10 @@ class LincolnCityCouncil(BaseScraper):
             if not earliest <= starts_at.date() <= latest:
                 continue
 
-            # Find the agenda link anywhere in the row: it sits in a different
-            # column in the upcoming table than in the archive tables.
+            # The agenda link sits in a different column in the upcoming table
+            # than in the archives, so search the whole row. It may be missing
+            # entirely on a meeting whose agenda has not been posted; that is
+            # fine, the API does not require one and a later run fills it in.
             agenda_href = ""
             for link in row.find_all("a"):
                 href = link.get("href", "")
@@ -153,27 +184,20 @@ class LincolnCityCouncil(BaseScraper):
                     agenda_href = _absolute(href)
                     break
 
-            if not agenda_href:
-                # The API requires agendaUrl, so this meeting cannot be submitted
-                # yet. A later run picks it up once Lincoln posts the agenda.
-                self.skipped_no_agenda += 1
-                continue
-
-            clip_match = CLIP_ID_RE.search(agenda_href)
-            clip_id = clip_match.group(1) if clip_match else agenda_href
-            if clip_id in seen_clips:
+            external_id = self._external_id(row, starts_at)
+            if external_id in seen_clips:
                 continue  # a meeting can appear in both upcoming and archives
-            seen_clips.add(clip_id)
+            seen_clips.add(external_id)
 
             meeting_type = classify(" ".join(cells[0].get_text().split()))
             meetings.append(
                 Meeting(
                     name=TYPE_NAMES[meeting_type],
                     starts_at=starts_at,
+                    external_id=external_id,
                     location=PLACE,
-                    agenda_url=agenda_href,
+                    agenda_url=agenda_href or None,
                     meeting_type=meeting_type,
-                    source_id=clip_id,
                 )
             )
 

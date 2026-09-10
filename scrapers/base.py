@@ -24,8 +24,12 @@ class BaseScraper(ABC):
     def fetch(self) -> list[Meeting]:
         """Scrape the source and return meetings, sorted by start time.
 
-        Meetings with no agenda URL must be left out -- the API requires one.
-        Track them with self.skipped_no_agenda so the runner can report them.
+        Every Meeting needs an external_id that is stable for the life of that
+        meeting -- the source system's own id. It is what lets the platform
+        update a meeting that moves instead of filing a second copy of it.
+
+        A meeting whose agenda has not been posted yet still belongs in the
+        list; agenda_url is optional and a later run fills it in.
         """
 
     def __init__(self, since: date | None = None, until: date | None = None) -> None:
@@ -33,4 +37,3 @@ class BaseScraper(ABC):
         # each scraper uses its own rolling default.
         self.since = since
         self.until = until
-        self.skipped_no_agenda: int = 0

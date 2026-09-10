@@ -8,7 +8,7 @@ The API that these scrapers will service is for a website that handles giving as
 
 In this folder is some prior work that scrapes meetings from the Lincoln City Council into a csv. It works well and should provide a good guide as to what will come next. 
 
-Here's a link to some scraper documentation: https://necivicnewsroom.up.railway.app/docs/scraper-api-guide
+Here's a link to some scraper documentation: https://civicnewsroom.org/docs/scraper-api-guide
 
 The API key lives in `.env` (gitignored) as `PLATFORM_API_KEY`. See `.env.example` for the variable names.
 
