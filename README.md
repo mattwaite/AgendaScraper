@@ -5,7 +5,12 @@ NE Civic Newsroom API, which editors use to assign reporters to meetings. One
 scraper per government body; a shared client handles authentication and
 deduplication so a scraper is only a parser.
 
-Currently implemented: **Lincoln City Council**.
+Currently implemented:
+
+| Agency | Slug | Source |
+|---|---|---|
+| Lincoln City Council | `lincoln_city_council` | Granicus portal |
+| Lancaster County Board of Commissioners | `lancaster_county_commissioners` | CivicPlus Agenda Center + agenda PDFs |
 
 ## Setup
 
@@ -58,6 +63,9 @@ it, keyed on the meeting's `externalId` (the Granicus `clip_id`):
 - `conflict` — a `409`, meaning this meeting's `externalId` has changed since it
   was filed. Needs a human; see the recovery section of
   [`docs/api-notes.md`](docs/api-notes.md).
+- `skipped` — only shown when non-zero: the source didn't give enough to build a
+  meeting (Lancaster, for instance, skips a meeting whose agenda has no start
+  time rather than inventing one). Each reason is logged as a warning.
 
 Runs are safe to repeat: a second run immediately after the first reports
 everything as `duplicate`.
@@ -88,7 +96,9 @@ before it can duplicate the rest.
    the platform recognizes a meeting it already has. Meeting names, by contrast,
    are free to change.
 3. Include meetings whose agenda isn't posted yet; `agenda_url` is optional and
-   a later run fills it in.
+   a later run fills it in. If the source withholds something the API needs —
+   Lancaster's listing has no meeting time — call `self.skip(reason)` rather
+   than guessing a value; the run reports the count and logs each reason.
 4. Register the class in `scrapers/registry.py`.
 5. Save a copy of the source page under `tests/fixtures/` and write parser tests
    against it.

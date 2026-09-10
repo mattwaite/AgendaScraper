@@ -5,10 +5,13 @@ objects. Agency verification, deduplication and submission all live in the
 runner, so no scraper contains API code.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from datetime import date
 
 from .meeting import Meeting
+
+log = logging.getLogger(__name__)
 
 
 class ScraperError(RuntimeError):
@@ -37,3 +40,15 @@ class BaseScraper(ABC):
         # each scraper uses its own rolling default.
         self.since = since
         self.until = until
+        self.skipped: list[str] = []
+
+    def skip(self, reason: str) -> None:
+        """Record a meeting the scraper could not turn into a Meeting.
+
+        Skipping should be rare and always visible: the runner reports the
+        count and each reason is logged. Prefer skipping over inventing a value
+        the source did not give us -- a meeting with a made-up time is worse
+        than one an editor can see is missing.
+        """
+        log.warning("skipped: %s", reason)
+        self.skipped.append(reason)

@@ -1,9 +1,11 @@
 """Maps a CLI slug to its scraper class. Add one line per new agency."""
 
+from .agencies.lancaster_county_commissioners import LancasterCountyCommissioners
 from .agencies.lincoln_city_council import LincolnCityCouncil
 from .base import BaseScraper
 
 SCRAPERS: dict[str, type[BaseScraper]] = {
+    LancasterCountyCommissioners.slug: LancasterCountyCommissioners,
     LincolnCityCouncil.slug: LincolnCityCouncil,
 }
 
