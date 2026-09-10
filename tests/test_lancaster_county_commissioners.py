@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from scrapers.agencies.lancaster_county_commissioners import (
+    DEFAULT_PLACE,
     LancasterCountyCommissioners,
     classify,
     parse_agenda_text,
@@ -126,7 +127,7 @@ def test_builds_a_meeting_from_a_row_and_its_agenda():
     scraper, meeting = build_one(AGENDA)
     assert meeting.name == "Lancaster County Board of Commissioners Regular Meeting"
     assert meeting.starts_at.isoformat() == "2026-09-08T09:00:00-05:00"
-    assert meeting.external_id == "lnc-agenda-2659"
+    assert meeting.external_id == "lnc-commissioners-2026-09-08"
     assert meeting.agenda_url == "https://example.test/agenda"
     assert scraper.skipped == []
 
@@ -157,18 +158,94 @@ def test_an_unreadable_agenda_is_skipped_with_a_reason():
     assert "could not read the agenda" in scraper.skipped[0]
 
 
-def test_external_id_does_not_move_when_the_meeting_does():
-    """The agenda id keys the upsert, so a rescheduled meeting updates its
-    existing record rather than creating a second one."""
+def test_external_id_does_not_move_when_the_meetings_time_changes():
+    """A meeting whose time moves within the day keeps its id, so the platform
+    updates that record rather than creating a second one. The series is part of
+    the key because the board and the Board of Equalization sit the same
+    morning; the agenda file's own id is not, because the calendar half of this
+    scraper has no such id and the meeting must read the same either way."""
     _, before = build_one(AGENDA)
-    _, after = build_one(
-        AGENDA.replace("AT 9:00 AM", "AT 1:30 PM"),
-        entry={
-            "date": date(2026, 9, 9),
-            "agenda_id": "2659",
-            "agenda_url": "https://example.test/agenda",
-            "title": "Board of Commissioners",
-        },
-    )
+    _, after = build_one(AGENDA.replace("AT 9:00 AM", "AT 1:30 PM"))
     assert before.external_id == after.external_id
     assert before.starts_at != after.starts_at
+
+
+# --- the calendar half -------------------------------------------------------
+#
+# The Agenda Center stops at the last meeting held; the iCalendar feed carries
+# the ones still to come. On 2026-09-10 the two did not overlap at all.
+
+FEED = (FIXTURES / "lancaster_calendar.ics").read_text()
+TODAY = date(2026, 9, 10)
+
+
+def from_calendar(existing=None, feed=FEED, **kwargs):
+    scraper = LancasterCountyCommissioners(**kwargs)
+    with patch.object(
+        scraper, "_in_window", side_effect=lambda d: WINDOW(scraper, d)
+    ):
+        return scraper, scraper.from_calendar(feed, existing or {})
+
+
+def WINDOW(scraper, day):
+    from datetime import timedelta
+
+    earliest = scraper.since or TODAY - timedelta(days=7)
+    latest = scraper.until or TODAY + timedelta(days=400)
+    return earliest <= day <= latest
+
+
+def test_the_calendar_supplies_the_future_meetings():
+    """The reason for the second source: the Agenda Center has none."""
+    _, meetings = from_calendar()
+    assert [(m.starts_at.date(), m.meeting_type) for m in meetings] == [
+        (date(2026, 9, 29), "REGULAR"),
+        (date(2026, 10, 27), "REGULAR"),
+        (date(2026, 9, 15), "HEARING"),
+    ]
+    assert all(m.agenda_url is None for m in meetings)
+
+
+def test_equalization_sits_the_same_morning_and_keeps_its_own_identity():
+    """The board and the Board of Equalization meet on one date, so the date
+    alone cannot key a meeting -- the series has to be part of it."""
+    _, meetings = from_calendar()
+    boe = [m for m in meetings if m.meeting_type == "HEARING"][0]
+    assert boe.external_id == "lnc-equalization-2026-09-15"
+    assert boe.name == "Lancaster County Board of Equalization"
+
+
+def test_a_meeting_the_agenda_center_already_has_is_not_repeated():
+    existing = {"lnc-commissioners-2026-09-29": object()}
+    _, meetings = from_calendar(existing)
+    assert date(2026, 9, 29) not in [m.starts_at.date() for m in meetings]
+
+
+def test_staff_meetings_are_left_out_with_one_line_not_seventy(caplog):
+    """The county lists them as all-day entries with no start time."""
+    scraper, meetings = from_calendar()
+    assert all("Staff" not in m.name for m in meetings)
+    assert scraper.skipped == []  # a known gap, not a per-meeting failure
+    assert "staff meetings left out" in caplog.text
+
+
+def test_another_bodys_meetings_are_ignored():
+    """The Public Building Commission shares this calendar and is not us."""
+    _, meetings = from_calendar(until=date(2027, 12, 31))
+    assert all("Building Commission" not in m.name for m in meetings)
+
+
+def test_holidays_are_not_meetings():
+    _, meetings = from_calendar(until=date(2050, 1, 1))
+    assert all("Christmas" not in m.name for m in meetings)
+
+
+def test_dates_outside_the_window_are_left_alone():
+    _, meetings = from_calendar()
+    assert date(2019, 12, 3) not in [m.starts_at.date() for m in meetings]
+
+
+def test_the_feeds_own_location_is_not_used():
+    """It reads "- Lincoln NE 68502", which would tell a reporter nothing."""
+    _, meetings = from_calendar()
+    assert all(m.location == DEFAULT_PLACE for m in meetings)
