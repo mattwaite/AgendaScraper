@@ -11,6 +11,7 @@ Currently implemented:
 |---|---|---|
 | Lincoln City Council | `lincoln_city_council` | Granicus portal |
 | Lancaster County Board of Commissioners | `lancaster_county_commissioners` | CivicPlus Agenda Center + agenda PDFs |
+| Lincoln Public Schools Board of Education | `lps_board_of_education` | SPARQ Data portal |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | lincoln.ne.gov calendar + landing page |
 
 ## Setup
@@ -39,7 +40,7 @@ Useful flags:
 
 | Flag | Effect |
 |---|---|
-| `--dry-run` | Scrape and dedup-check, print the exact JSON payloads, submit nothing |
+| `--dry-run` | Scrape and print the exact JSON payloads, submit nothing. Reports `would submit N` rather than guessing which the platform already holds |
 | `--format csv\|json` with `--out FILE` | Write meetings to a file instead of submitting |
 | `--since` / `--until` | Override the default window (7 days back → 400 days ahead), `YYYY-MM-DD` |
 | `--limit N` | Keep only the earliest N meetings — for `--dry-run` and CSV/JSON output |
@@ -96,6 +97,11 @@ before it can duplicate the rest.
    for that meeting. **This is the one value that must never drift** — it is how
    the platform recognizes a meeting it already has. Meeting names, by contrast,
    are free to change.
+
+   Name meetings from the source's own titles where those are specific (LPS
+   distinguishes work sessions, budget hearings and named committees), and from
+   a constant per meeting type where they aren't — Granicus and Agenda Center
+   say only "City Council - Action" or "Board of Commissioners".
 3. Include meetings whose agenda isn't posted yet; `agenda_url` is optional and
    a later run fills it in. The planning commission publishes its schedule
    months ahead of any agenda, which is the lead time editors actually want.

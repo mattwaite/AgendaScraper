@@ -262,7 +262,10 @@ def test_dry_run_never_calls_the_api():
     with patch.object(client, "submit_meeting") as api:
         counts = submit(client, FakeScraper(), [make_meeting()], dry_run=True)
     api.assert_not_called()
-    assert counts["created"] == 1
+    # Counted apart from `created`: with no POST there is no way to know whether
+    # the platform already holds this meeting.
+    assert counts["would-submit"] == 1
+    assert counts["created"] == 0
 
 
 # --- carrying values forward -------------------------------------------------
