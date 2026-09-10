@@ -100,10 +100,18 @@ before it can duplicate the rest.
 1. Create `scrapers/agencies/<agency>.py` with a `BaseScraper` subclass that
    sets `slug`, `agency_id` (from `docs/api-notes.md`), and `agency_name`, and
    implements `fetch() -> list[Meeting]`.
-2. Give every `Meeting` an `external_id` taken from the source system's own id
-   for that meeting. **This is the one value that must never drift** — it is how
-   the platform recognizes a meeting it already has. Meeting names, by contrast,
-   are free to change.
+2. Give every `Meeting` an `external_id`. **This is the one value that must
+   never drift** — it is how the platform recognizes a meeting it already has.
+   Meeting names, by contrast, are free to change.
+
+   Do *not* use the source system's own meeting id, however stable it looks.
+   Every agency here reads two sources, and only one of them has that id — the
+   record would change identity the moment the meeting moved from the calendar
+   to the agenda system, stranding the first copy. Build the id from what both
+   sources can produce, and make it the narrowest key that still tells two
+   meetings apart: a date is enough for the council, LPS needs the time too.
+   See "Choosing an externalId" in `docs/api-notes.md` for the schemes and the
+   collision counts behind them.
 
    Name meetings from the source's own titles where those are specific (LPS
    distinguishes work sessions, budget hearings and named committees), and from
@@ -137,7 +145,7 @@ deduplication, and submission.
 | `scrapers/base.py` | `BaseScraper` — the contract a scraper implements |
 | `scrapers/run.py` | CLI: dedup, submit, report |
 | `scrapers/agencies/` | One module per government body |
-| `scrapers/sources/` | Parsers for a publishing platform shared by several agencies (OpenCities calendars, CivicPlus iCalendar feeds) |
+| `scrapers/sources/` | Readers for a publishing platform, reusable across agencies (OpenCities calendars, CivicPlus iCalendar feeds, Thrillshare district calendars) |
 | `docs/api-notes.md` | Verified API behavior; read before adding a scraper |
 | `tools/verify_upsert.py` | Proves upsert works, against the sandbox agency |
 
