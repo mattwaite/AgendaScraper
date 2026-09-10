@@ -69,6 +69,29 @@ submitted before. Run the first pass against an agency with
 `--stop-on-unexpected-create`: a `created` where an adoption was expected means
 the names drifted and the run is about to duplicate everything.
 
+## A POST replaces the record; it does not merge into it
+
+**Leaving an optional field out of a submission clears whatever the platform had
+in it.** Verified 2026-09-10: submitting a meeting with an `agendaUrl`, then
+resubmitting the same `externalId` without one, answered
+`updated, changed: ["agendaUrl"]` and left the stored value `null`.
+
+The guide says `PATCH` is partial. It does not say the opposite about `POST`,
+and the upsert language ("resubmission with a changed time, name, location or
+agenda URL → updated") reads as though only what you send is considered.
+
+This bites any source that stops exposing a value it used to. The planning
+commission links an agenda for the *next* meeting only, so without care every
+later run would erase the agenda from the meeting before it.
+
+`carry_forward` in `scrapers/run.py` handles it: the runner reads the agency's
+existing meetings once per run and, for any optional field the scrape didn't
+find but the platform already holds, puts the stored value back. Required
+fields are never carried forward — a stale name or time must not leak back in.
+
+Erasing something an editor can see is worse than keeping a value that has gone
+slightly stale, and a wrong one can still be cleared by hand.
+
 ## Required and optional fields
 
 Required: `name`, `dateTime`, `agencyId`.
@@ -168,3 +191,8 @@ run of a new scraper.
    pre-`externalId` records came back as `updated: true` with an empty `changed`
    array. Same outcome, and nothing duplicated — worth knowing which is
    intended, since it's the signal a first run is checked against.
+2. **Is POST-as-full-replace intended?** Omitting an optional field clears it
+   (see above). It's a quiet way to lose data: a scraper that simply doesn't
+   find an agenda URL this week erases the one an editor was relying on. If
+   omitted-means-unchanged were the rule, the `carry_forward` workaround could
+   go. Either way it's worth a line in the guide.

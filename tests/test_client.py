@@ -12,7 +12,7 @@ from scrapers.client import (
     SubmitResult,
 )
 from scrapers.meeting import CENTRAL, Meeting
-from scrapers.run import UnexpectedCreate, submit
+from scrapers.run import UnexpectedCreate, carry_forward, submit
 
 AGENCY = "cmryg8k2p0001s91mclkzpdnq"
 
@@ -206,14 +206,15 @@ def test_writes_are_throttled():
 # --- submit ------------------------------------------------------------------
 
 
-def submit_with(outcomes, **kwargs):
+def submit_with(outcomes, stored=None, **kwargs):
     """Run submit() over N meetings, with the API returning `outcomes` in turn."""
     client = make_client()
     meetings = [
         make_meeting(external_id=f"lnk-clip-{i}") for i in range(len(outcomes))
     ]
-    with patch.object(client, "submit_meeting", side_effect=outcomes):
-        return submit(client, FakeScraper(), meetings, dry_run=False, **kwargs)
+    with patch.object(client, "list_meetings", return_value=stored or []):
+        with patch.object(client, "submit_meeting", side_effect=outcomes):
+            return submit(client, FakeScraper(), meetings, dry_run=False, **kwargs)
 
 
 def test_counts_every_outcome_separately():
@@ -261,4 +262,83 @@ def test_dry_run_never_calls_the_api():
     with patch.object(client, "submit_meeting") as api:
         counts = submit(client, FakeScraper(), [make_meeting()], dry_run=True)
     api.assert_not_called()
+    assert counts["created"] == 1
+
+
+# --- carrying values forward -------------------------------------------------
+#
+# Submitting replaces the whole record rather than merging into it, so a payload
+# that omits agendaUrl clears the stored one. Verified against the live API on
+# 2026-09-10; see docs/api-notes.md.
+
+
+def test_a_value_the_scrape_missed_is_kept_from_the_stored_record():
+    payload = make_meeting(agenda_url=None).to_payload(AGENCY)
+    assert "agendaUrl" not in payload
+
+    merged = carry_forward(payload, {"agendaUrl": "https://example.test/old.pdf"})
+    assert merged["agendaUrl"] == "https://example.test/old.pdf"
+
+
+def test_a_freshly_scraped_value_wins_over_the_stored_one():
+    payload = make_meeting(agenda_url="https://example.test/new.pdf").to_payload(AGENCY)
+    merged = carry_forward(payload, {"agendaUrl": "https://example.test/old.pdf"})
+    assert merged["agendaUrl"] == "https://example.test/new.pdf"
+
+
+def test_nothing_is_invented_when_the_platform_has_nothing():
+    payload = make_meeting(agenda_url=None).to_payload(AGENCY)
+    assert "agendaUrl" not in carry_forward(payload, {})
+    assert "agendaUrl" not in carry_forward(payload, None)
+
+
+def test_every_optional_field_is_carried_forward():
+    payload = make_meeting(agenda_url=None, location=None).to_payload(AGENCY)
+    stored = {
+        "agendaUrl": "https://example.test/a.pdf",
+        "location": "Room 112",
+        "details": "budget",
+        "livestreamUrl": "https://example.test/live",
+        "contactPerson": "Jane Doe",
+    }
+    merged = carry_forward(payload, stored)
+    for field, value in stored.items():
+        assert merged[field] == value
+
+
+def test_required_fields_are_never_taken_from_the_stored_record():
+    """A stale name or time must not leak back in -- those come from the scrape."""
+    payload = make_meeting().to_payload(AGENCY)
+    merged = carry_forward(
+        payload, {"name": "Old Name", "dateTime": "1999-01-01T00:00:00-06:00"}
+    )
+    assert merged["name"] == "Lincoln City Council Regular Meeting"
+    assert merged["dateTime"] == "2026-08-31T17:30:00-05:00"
+
+
+def test_submit_reads_existing_meetings_once_and_merges_them_in():
+    client = make_client()
+    meetings = [make_meeting(agenda_url=None)]
+    stored = [
+        {
+            "externalId": "lnk-clip-426",
+            "agendaUrl": "https://example.test/kept.pdf",
+        }
+    ]
+    with patch.object(client, "list_meetings", return_value=stored) as reader:
+        with patch.object(
+            client, "submit_meeting", return_value=SubmitResult(id="x", created=False)
+        ) as writer:
+            submit(client, FakeScraper(), meetings, dry_run=False)
+    reader.assert_called_once()
+    assert writer.call_args[0][0]["agendaUrl"] == "https://example.test/kept.pdf"
+
+
+def test_submit_carries_on_when_existing_meetings_cannot_be_read():
+    client = make_client()
+    with patch.object(client, "list_meetings", side_effect=PlatformError("down")):
+        with patch.object(
+            client, "submit_meeting", return_value=SubmitResult(id="x", created=True)
+        ):
+            counts = submit(client, FakeScraper(), [make_meeting()], dry_run=False)
     assert counts["created"] == 1
