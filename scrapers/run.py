@@ -213,7 +213,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.format in ("csv", "json"):
         write_rows(meetings, args.format, args.out)
-        print(f"scraped {len(meetings)}")
+        skipped = f" / skipped {len(scraper.skipped)}" if scraper.skipped else ""
+        print(f"scraped {len(meetings)}{skipped}")
         return 0
 
     try:
@@ -231,9 +232,10 @@ def main(argv: list[str] | None = None) -> int:
 
     prefix = "DRY RUN: " if args.dry_run else ""
     tally = " / ".join(f"{name} {counts[name]}" for name in OUTCOMES)
+    skipped = f" / skipped {len(scraper.skipped)}" if scraper.skipped else ""
     print(
         f"{prefix}scraped {len(meetings)} / {tally} / "
-        f"conflict {counts['conflict']} / failed {counts['failed']}"
+        f"conflict {counts['conflict']} / failed {counts['failed']}{skipped}"
     )
     return 1 if counts["failed"] or counts["conflict"] else 0
 
