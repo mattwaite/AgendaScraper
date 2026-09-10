@@ -15,6 +15,15 @@ schedule to the end of the school year -- 16 meetings running to May 2027 when
 this was written -- with no agenda links. A meeting goes in as soon as it is
 scheduled and gains its agenda on a later run once SPARQ publishes it.
 
+Only the board's own meetings are on that calendar. Its committees -- finance,
+wellness, work sessions -- are still SPARQ-only, so those keep appearing about
+a week out. When SPARQ takes a record over it also brings its explicit meeting
+type, which can differ from the one read off the calendar's title here: the
+organizational meeting reads SPECIAL from the title and `Regular` in SPARQ, so
+that record updates to REGULAR when the agenda posts. That is the right way
+round -- SPARQ states the type, this scraper guesses it -- but it does show up
+in a run's output as a changed field.
+
 Because the titles in SPARQ are specific -- work sessions, budget hearings,
 named committees -- meeting names come from the source rather than from a
 constant per type, unlike the Granicus and Agenda Center scrapers whose titles

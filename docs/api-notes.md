@@ -73,6 +73,34 @@ narrowest key the two sources agree on.
 Where a scheme cannot represent two meetings that collide, the scraper skips
 the second with a warning rather than silently overwriting the first.
 
+### The failure the upsert cannot see: stranded records
+
+Any id that encodes something about the meeting drifts when that thing changes
+upstream. If LPS moves a meeting from 6:00 to 5:30, the run files
+`lps-2026-10-13-1730` and `lps-2026-10-13-1800` stays behind — an editor now
+sees the meeting twice, once at an hour nobody is meeting at. The platform
+cannot help: from its side those are simply two meetings.
+
+So after submitting, the runner compares the ids it produced against the
+records the platform holds over the same dates, and warns about any it did not
+account for:
+
+```
+WARNING lps-2026-10-13-1800 (2026-10-13T23:00:00.000Z) is on the platform but
+this run did not produce it ... should be deleted by hand (id cmtw1pjb...)
+```
+
+It reports rather than deletes, because a source that drops a meeting for one
+run would otherwise take a real record with it. Verified against ZZ Test
+Agency: file at 18:00, re-file at 17:30, the 18:00 record is reported.
+
+Records with no `externalId` are never reported — those are an editor's own
+work, or predate the import.
+
+Two limits worth knowing: only the scraped date range is checked, so a meeting
+moved to a *different day* is not caught, and `--dry-run` reports nothing
+because it never reads the platform.
+
 ### Adoption: the first run with an externalId
 
 Meetings submitted before `externalId` existed are matched on name + time and
