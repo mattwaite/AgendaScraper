@@ -3,12 +3,14 @@
 from .agencies.lancaster_county_commissioners import LancasterCountyCommissioners
 from .agencies.lincoln_city_council import LincolnCityCouncil
 from .agencies.lps_board_of_education import LpsBoardOfEducation
+from .agencies.planning_commission import PlanningCommission
 from .base import BaseScraper
 
 SCRAPERS: dict[str, type[BaseScraper]] = {
     LancasterCountyCommissioners.slug: LancasterCountyCommissioners,
     LincolnCityCouncil.slug: LincolnCityCouncil,
     LpsBoardOfEducation.slug: LpsBoardOfEducation,
+    PlanningCommission.slug: PlanningCommission,
 }
 
 

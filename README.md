@@ -12,6 +12,7 @@ Currently implemented:
 | Lincoln City Council | `lincoln_city_council` | Granicus portal |
 | Lancaster County Board of Commissioners | `lancaster_county_commissioners` | CivicPlus Agenda Center + agenda PDFs |
 | Lincoln Public Schools Board of Education | `lps_board_of_education` | SPARQ Data portal |
+| Lincoln-Lancaster County Planning Commission | `planning_commission` | lincoln.ne.gov calendar + landing page |
 
 ## Setup
 
@@ -102,9 +103,15 @@ before it can duplicate the rest.
    a constant per meeting type where they aren't — Granicus and Agenda Center
    say only "City Council - Action" or "Board of Commissioners".
 3. Include meetings whose agenda isn't posted yet; `agenda_url` is optional and
-   a later run fills it in. If the source withholds something the API needs —
-   Lancaster's listing has no meeting time — call `self.skip(reason)` rather
-   than guessing a value; the run reports the count and logs each reason.
+   a later run fills it in. The planning commission publishes its schedule
+   months ahead of any agenda, which is the lead time editors actually want.
+   If the source withholds something the API needs — Lancaster's listing has no
+   meeting time — call `self.skip(reason)` rather than guessing a value; the run
+   reports the count and logs each reason.
+
+   Don't worry about a value the source only sometimes exposes: submitting
+   replaces the whole record, so the runner puts back any optional field the
+   platform already holds that this scrape didn't find.
 4. Register the class in `scrapers/registry.py`.
 5. Save a copy of the source page under `tests/fixtures/` and write parser tests
    against it.

@@ -42,6 +42,50 @@ def parse_date(value: str) -> date:
 
 OUTCOMES = ("created", "adopted", "updated", "duplicate")
 
+# Fields the platform stores that a source may only expose some of the time.
+# A POST replaces the whole record, so leaving one out erases it.
+CARRIED_FORWARD = ("agendaUrl", "location", "details", "livestreamUrl", "contactPerson")
+
+
+def carry_forward(payload: dict, stored: dict | None) -> dict:
+    """Keep optional values the platform already has but this scrape didn't find.
+
+    Submitting is a full replace, not a merge: a payload without `agendaUrl`
+    clears the stored one (verified against the API, see docs/api-notes.md).
+    That matters because sources come and go with these values -- Lincoln's
+    planning commission, for instance, links the agenda for the next meeting
+    only, so every later run would wipe it.
+
+    Erasing something an editor can see is worse than keeping a value that is
+    slightly stale, and a wrong one can still be cleared by hand.
+    """
+    if not stored:
+        return payload
+    for field in CARRIED_FORWARD:
+        if not payload.get(field) and stored.get(field):
+            payload[field] = stored[field]
+            log.debug("kept existing %s for %s", field, payload.get("externalId"))
+    return payload
+
+
+def stored_by_external_id(
+    client: PlatformClient, scraper: BaseScraper, meetings: list[Meeting]
+) -> dict[str, dict]:
+    """What the platform already holds for the meetings we're about to submit."""
+    if not meetings:
+        return {}
+    window_start = min(m.starts_at for m in meetings).date()
+    window_end = max(m.starts_at for m in meetings).date()
+    try:
+        existing = client.list_meetings(
+            scraper.agency_id, from_=window_start, to=window_end
+        )
+    except PlatformError as exc:
+        # Not fatal: without this we simply cannot carry values forward.
+        log.warning("could not read existing meetings (%s); submitting as scraped", exc)
+        return {}
+    return {m["externalId"]: m for m in existing if m.get("externalId")}
+
 
 def write_rows(meetings: list[Meeting], fmt: str, out: str | None) -> None:
     rows = [m.to_row() for m in meetings]
@@ -77,9 +121,12 @@ def submit(
     and its answer is more trustworthy than anything we could work out here.
     """
     counts = dict.fromkeys((*OUTCOMES, "conflict", "failed", "would-submit"), 0)
+    stored = {} if dry_run else stored_by_external_id(client, scraper, meetings)
 
     for meeting in meetings:
-        payload = meeting.to_payload(scraper.agency_id)
+        payload = carry_forward(
+            meeting.to_payload(scraper.agency_id), stored.get(meeting.external_id)
+        )
         if dry_run:
             log.info("would POST %s", json.dumps(payload))
             counts["would-submit"] += 1
