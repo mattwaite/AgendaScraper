@@ -206,12 +206,11 @@ def test_writes_are_throttled():
 # --- submit ------------------------------------------------------------------
 
 
-def submit_with(outcomes, stored=None, **kwargs):
+def submit_with(outcomes, stored=None, external_ids=None, **kwargs):
     """Run submit() over N meetings, with the API returning `outcomes` in turn."""
     client = make_client()
-    meetings = [
-        make_meeting(external_id=f"lnk-clip-{i}") for i in range(len(outcomes))
-    ]
+    ids = external_ids or [f"lnk-clip-{i}" for i in range(len(outcomes))]
+    meetings = [make_meeting(external_id=eid) for eid in ids]
     with patch.object(client, "list_meetings", return_value=stored or []):
         with patch.object(client, "submit_meeting", side_effect=outcomes):
             return submit(client, FakeScraper(), meetings, dry_run=False, **kwargs)
@@ -345,3 +344,64 @@ def test_submit_carries_on_when_existing_meetings_cannot_be_read():
         ):
             counts = submit(client, FakeScraper(), [make_meeting()], dry_run=False)
     assert counts["created"] == 1
+
+
+# --- stranded records --------------------------------------------------------
+
+
+def test_a_rescheduled_meeting_leaves_its_old_record_reported(caplog):
+    """The failure the upsert cannot see. An externalId carrying the start time
+    changes when the meeting moves, so the new hour is filed under a new id and
+    the old record stays behind at an hour nobody is meeting at."""
+    stored = [
+        {
+            "id": "rec-old",
+            "externalId": "lps-2026-10-13-1800",
+            "dateTime": "2026-10-13T23:00:00.000Z",
+        }
+    ]
+    counts = submit_with(
+        [SubmitResult(id="rec-new", created=True)],
+        stored=stored,
+        external_ids=["lps-2026-10-13-1730"],
+    )
+    assert counts["stranded"] == 1
+    assert "lps-2026-10-13-1800" in caplog.text
+    assert "rec-old" in caplog.text
+
+
+def test_a_record_the_scrape_still_produces_is_not_stranded():
+    stored = [
+        {
+            "id": "rec-1",
+            "externalId": "lps-2026-10-13-1800",
+            "dateTime": "2026-10-13T23:00:00.000Z",
+        }
+    ]
+    counts = submit_with(
+        [SubmitResult(id="rec-1", created=False, reason="duplicate")],
+        stored=stored,
+        external_ids=["lps-2026-10-13-1800"],
+    )
+    assert counts["stranded"] == 0
+
+
+def test_records_with_no_external_id_are_left_alone():
+    """Meetings an editor added by hand, or imported before externalId existed.
+    Reporting those would be telling someone to delete their own work."""
+    stored = [{"id": "rec-manual", "dateTime": "2026-10-13T23:00:00.000Z"}]
+    counts = submit_with(
+        [SubmitResult(id="rec-new", created=True)],
+        stored=stored,
+        external_ids=["lps-2026-10-13-1730"],
+    )
+    assert counts["stranded"] == 0
+
+
+def test_a_dry_run_reports_nothing_stranded():
+    """It never reads the platform, so it has nothing to compare against."""
+    client = make_client()
+    with patch.object(client, "list_meetings") as reader:
+        counts = submit(client, FakeScraper(), [make_meeting()], dry_run=True)
+    reader.assert_not_called()
+    assert counts["stranded"] == 0

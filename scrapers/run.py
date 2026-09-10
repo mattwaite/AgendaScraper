@@ -87,6 +87,39 @@ def stored_by_external_id(
     return {m["externalId"]: m for m in existing if m.get("externalId")}
 
 
+def report_stranded(
+    stored: dict[str, dict], meetings: list[Meeting]
+) -> list[dict]:
+    """Records the platform holds that this scrape no longer accounts for.
+
+    An `externalId` that encodes anything about the meeting -- Lancaster's
+    series, LPS's start time -- changes when that thing changes upstream. The
+    new id is created and the old record is left behind, showing an editor a
+    meeting at an hour nobody is meeting at. Nothing in the upsert can notice
+    this, because from the platform's side the two ids are simply two meetings.
+
+    So it is reported, not deleted: a source that drops a meeting for a run
+    would otherwise take a real record with it. A human confirms and removes it
+    with the recovery commands in docs/api-notes.md.
+
+    Only the date range that was scraped is checked, so a meeting moved to a
+    different day is out of scope here -- the run's own window is the limit.
+    """
+    produced = {m.external_id for m in meetings}
+    stranded = [record for eid, record in sorted(stored.items()) if eid not in produced]
+    for record in stranded:
+        log.warning(
+            "%s (%s) is on the platform but this run did not produce it. If the "
+            "meeting was rescheduled its replacement is already filed under a "
+            "new externalId, and this record should be deleted by hand (id %s) "
+            "-- see the recovery section of docs/api-notes.md.",
+            record.get("externalId"),
+            record.get("dateTime", "no date"),
+            record.get("id"),
+        )
+    return stranded
+
+
 def write_rows(meetings: list[Meeting], fmt: str, out: str | None) -> None:
     rows = [m.to_row() for m in meetings]
     handle = open(out, "w", newline="") if out else sys.stdout
@@ -120,7 +153,9 @@ def submit(
     platform itself decides between creating, adopting, updating and ignoring,
     and its answer is more trustworthy than anything we could work out here.
     """
-    counts = dict.fromkeys((*OUTCOMES, "conflict", "failed", "would-submit"), 0)
+    counts = dict.fromkeys(
+        (*OUTCOMES, "conflict", "failed", "would-submit", "stranded"), 0
+    )
     stored = {} if dry_run else stored_by_external_id(client, scraper, meetings)
 
     for meeting in meetings:
@@ -172,6 +207,9 @@ def submit(
                 "duplicates of everything else. Re-run without "
                 "--stop-on-unexpected-create once you have checked why."
             )
+
+    if not dry_run:
+        counts["stranded"] = len(report_stranded(stored, meetings))
     return counts
 
 
@@ -288,9 +326,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     tally = " / ".join(f"{name} {counts[name]}" for name in OUTCOMES)
+    stranded = f" / stranded {counts['stranded']}" if counts["stranded"] else ""
     print(
         f"scraped {len(meetings)} / {tally} / "
-        f"conflict {counts['conflict']} / failed {counts['failed']}{skipped}"
+        f"conflict {counts['conflict']} / failed {counts['failed']}"
+        f"{stranded}{skipped}"
     )
     return 1 if counts["failed"] or counts["conflict"] else 0
 
