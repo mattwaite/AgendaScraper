@@ -77,9 +77,17 @@ a new record and strands the old one.
 | Planning Commission | `llcpc-{date}` | One meeting per date |
 | OPS Board of Education | `ops-{date}-{HHMM}` | 51 of 409 dates carry more than one meeting |
 | Sarpy County | `sarpy-{portal id}` | One source covers past and future, so the id is safe — and beats a date key |
+| Omaha Inland Port Authority | `oipa-{date}` | One meeting per date; the time is *excluded* on purpose — see below |
 
 Where a scheme cannot represent two meetings that collide, the scraper skips
 the second with a warning rather than silently overwriting the first.
+
+**Never key on a field the scraper itself supplies a default for.** The Inland
+Port Authority's listing gives a date and no time, so a meeting with no agenda
+yet is filed at the board's standing 9:00 AM. Putting that time in the key
+would strand the record every time an agenda posted a non-standard hour — the
+August 2026 meeting was at 4:30 — turning a routine correction into a
+duplicate. The date alone is the stable part.
 
 ### The failure the upsert cannot see: stranded records
 

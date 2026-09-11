@@ -14,6 +14,7 @@ Currently implemented:
 | Lincoln Public Schools Board of Education | `lps_board_of_education` | SPARQ Data portal + district calendar API |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | lincoln.ne.gov calendar + landing page |
 | Omaha Public Schools Board of Education | `ops_board_of_education` | SPARQ Data portal + Finalsite district calendar |
+| Omaha Inland Port Authority | `omaha_port_authority` | omahaipa.com meetings page + agenda PDFs |
 | Sarpy County Board of Commissioners | `sarpy_county_commissioners` | CivicWeb portal meetings service |
 
 All four Lincoln agencies are done, and Omaha has begun. Most of them publish
@@ -22,8 +23,9 @@ calendar pages on lincoln.ne.gov, an iCalendar feed for the county, a
 Thrillshare events API for Lincoln's schools and a Finalsite calendar for
 Omaha's. Granicus, the Agenda Center and SPARQ each list a meeting only once
 its agenda is posted, so each of those scrapers reads a second source for the
-meetings still to come. Sarpy County is the exception: its CivicWeb service
-returns the archive and the schedule in one call.
+meetings still to come. Sarpy County and the Inland Port Authority are the
+exceptions: each publishes one page carrying the archive and the schedule
+together.
 
 Each scraper publishes only its agency's apex body — the board or council
 itself, not its committees and not a separate body that meets under the same

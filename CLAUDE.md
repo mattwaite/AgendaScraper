@@ -23,9 +23,15 @@ somewhere else. Go and find the second source before concluding otherwise. It
 has been an OpenCities calendar page, a CivicPlus iCalendar feed, a Thrillshare
 events API and a Finalsite calendar element so far.
 
-One agency breaks the pattern: Sarpy's CivicWeb service returns the archive and
-the schedule together, so it needs a single source. Check for that before
-building a merge — it is simpler, and it changes the right `external_id`.
+Two agencies break the pattern: Sarpy's CivicWeb service and the Inland Port
+Authority's meetings page each return the archive and the schedule together, so
+they need a single source. Check for that before building a merge — it is
+simpler, and it changes the right `external_id`.
+
+Where a source gives a date but no time, prefer reading the real time from the
+agenda and standing in the body's published hour until that exists, rather than
+skipping the meeting — the default self-corrects on the next run, and lead time
+is the point. Keep the defaulted field *out of the `external_id`.*
 
 Check `scrapers/sources/` first — those readers are agency-agnostic and one of
 them likely already covers a new site's platform. Omaha Public Schools needed
