@@ -11,9 +11,9 @@ from scrapers.agencies.lps_board_of_education import (
     canonical_name,
     clean_venue,
     external_id_for,
-    parse_listing,
 )
 from scrapers.base import ScraperError
+from scrapers.sources.sparq import parse_listing
 
 FIXTURES = Path(__file__).parent / "fixtures"
 LISTING = (FIXTURES / "lps_sparq_meetings.html").read_text()
