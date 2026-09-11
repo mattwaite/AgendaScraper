@@ -11,6 +11,10 @@ scraper" before writing one.** Both record behavior that was established
 empirically and is not guessable from the code. The rest of this file is the
 things those two don't say.
 
+`docs/status.md` is the other half: what is live, what is blocked and why, and
+the traps waiting in the agencies still to come. Read it when returning to this
+after a break.
+
 ## The pattern most of these agencies follow
 
 The system holding the **agendas** and the system holding the **schedule** are
