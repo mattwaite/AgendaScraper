@@ -436,6 +436,84 @@ def test_a_month_with_no_other_source_takes_its_date_from_the_agenda():
     assert all(m.starts_at.day == 18 for m in meetings)
 
 
+def test_a_block_missing_meetings_the_adopted_schedule_still_has_is_warned_about(caplog):
+    """The premise the horizon rule rests on: the block is the *complete* list
+    of what is still to come. If it is not, the difference is dropped and the
+    forward window is still non-empty, so nothing else would notice."""
+    import logging
+
+    caplog.set_level(logging.WARNING)
+
+    # The block has lost November and December; the adopted schedule still has
+    # all four meetings left in the year.
+    soup = BeautifulSoup(LISTING, "html.parser")
+    block = soup.find(
+        "h3", string=re.compile("2026 Board Meetings Schedule")
+    ).find_next_sibling("p")
+    block.clear()
+    block.append(BeautifulSoup("September 17<br/>October 15", "html.parser"))
+
+    _, meetings, _ = fetch_with(str(soup), agenda=None)
+
+    assert "adopted 2026 schedule has 4 meetings" in caplog.text
+    assert "schedule block lists 2" in caplog.text
+    # and the warning is earning its place: those two really are dropped
+    assert [m.starts_at.date() for m in meetings] == [
+        date(2026, 9, 17), date(2026, 10, 15)
+    ]
+
+
+def test_a_second_agenda_in_one_month_is_warned_about(caplog):
+    """A special meeting appears exactly this way, and no other source can see
+    it: it is neither adopted in advance nor listed in the block."""
+    import logging
+
+    caplog.set_level(logging.WARNING)
+    soup = BeautifulSoup(LISTING, "html.parser")
+    september = soup.find(
+        "h3", string=re.compile("2026 Minutes and Supporting Materials")
+    ).find_next_sibling("p")
+    september.append(
+        BeautifulSoup(
+            '<a href="/media/399998/2026-9-sept-special-board-agenda.pdf">'
+            "Board Agenda</a>",
+            "html.parser",
+        )
+    )
+
+    agendas, _ = parse_archive(str(soup))
+    assert agendas[(2026, 9)].endswith("2026-9-sept-board-agenda.pdf")  # the first wins
+    assert "more than one board agenda" in caplog.text
+
+
+def test_a_tentative_row_is_read_off_a_real_resolution():
+    """2023's adopted schedule footnoted June and July as "**", meaning the
+    board might yet cancel them. The note is carried, not discarded."""
+    table = [
+        ["All Committees Meeting\nTuesdays", None, None, "", None, "Board Meeting\nThursdays", None, None],
+        ["Date*", "Location*", "Time*", "", "", "Date*", "Location*", "Time*"],
+        ["June 13**", "Webex", "10:00 a.m.", "", None, "June 15**", "Omaha Douglas\nCivic Center", "5:00 p.m."],
+        ["July 18", "Webex", "10:00 a.m.", "", None, "July 20", "Omaha Douglas\nCivic Center", "5:00 p.m."],
+    ]
+    text = (
+        "Exhibit A\n"
+        "* Dates, times and locations are subject to change.\n"
+        "** Tentative. The Board may consider cancelling either the June or "
+        "July 2023 meetings.\n"
+    )
+    page = Mock(extract_table=Mock(return_value=table), extract_text=Mock(return_value=text))
+    pdf = MagicMock()
+    pdf.__enter__ = Mock(return_value=Mock(pages=[page]))
+    pdf.__exit__ = Mock(return_value=False)
+
+    with patch("scrapers.agencies.oppd_board_of_directors.pdfplumber.open", return_value=pdf):
+        rows = parse_schedule_resolution(b"", 2023)
+
+    assert rows[6]["day"] == date(2023, 6, 15)
+    assert rows[6]["details"].startswith("Tentative.")
+    assert rows[7]["details"] is None  # not footnoted
+
+
 def test_a_dead_agenda_link_does_not_lose_a_meeting_the_block_named():
     _, meetings, _ = fetch_with(agenda=None)
     assert by_id(meetings)["oppd-2026-09-17"].starts_at.hour == 17

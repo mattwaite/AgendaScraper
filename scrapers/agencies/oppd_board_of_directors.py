@@ -39,6 +39,14 @@ months where an agenda PDF and a resolution table both describe the same
 meeting: zero disagreements on either the date or the time, and all 52 agendas
 on the page read "REGULAR BOARD MEETING".
 
+The block and the resolution were checked against each other too, because that
+is the pair the merge below actually leans on: on 2026-09-11 the block listed
+September 17, October 15, November 19 and December 17, and those are exactly
+the four meetings the adopted 2026 schedule still had to come. Four of four.
+When that stops being true the run says so -- a block with fewer meetings left
+than the adopted schedule means the block is no longer the complete list, and
+the rest of the year would otherwise be dropped without a word.
+
 The board meets at most once a month -- 45 resolution rows, one per month, and
 one archive paragraph per month -- so the three sources are reconciled by month
 rather than by date. Where they overlap the fresher source wins: the block
@@ -235,7 +243,19 @@ def parse_archive(html: str) -> tuple[dict[tuple[int, int], str], dict[int, str]
                     # Scoped to this block's year: every year's archive has its
                     # own "September Board Agenda", and matching on the month
                     # alone would hand a 2026 meeting a 2022 agenda.
-                    agendas.setdefault((year, month), url)
+                    if (year, month) in agendas:
+                        # One agenda per month held across all 52 on the page,
+                        # and only a regular meeting is ever adopted or listed
+                        # in the block -- so a second one is very likely a
+                        # special meeting that no other source can see.
+                        log.warning(
+                            "%s-%02d links more than one board agenda. The "
+                            "second (%s) is not being read, and a special "
+                            "meeting would appear exactly this way -- check "
+                            "the page by hand.", year, month, url,
+                        )
+                        continue
+                    agendas[(year, month)] = url
     return agendas, resolutions
 
 
@@ -427,7 +447,27 @@ class OppdBoardOfDirectors(BaseScraper):
             data = self.read_pdf(session, resolutions[year])
             if data is None:
                 continue
-            for entry in parse_schedule_resolution(data, year).values():
+            adopted = parse_schedule_resolution(data, year)
+
+            # The horizon rule rests on the block being the *complete* list of
+            # what is still to come. If the adopted schedule has more meetings
+            # left in the year than the block does, that premise has failed and
+            # the difference is dropped silently -- the forward window is still
+            # non-empty, so nothing else here would notice.
+            if year in horizons:
+                still_to_come = [
+                    e["day"] for e in adopted.values() if e["day"] >= horizons[year]
+                ]
+                if len(still_to_come) > len(blocks[year]):
+                    log.warning(
+                        "the adopted %s schedule has %d meetings from %s onward "
+                        "but the page's schedule block lists %d. Meetings the "
+                        "block omits are not being published -- check %s by hand.",
+                        year, len(still_to_come), horizons[year].isoformat(),
+                        len(blocks[year]), LISTING_URL,
+                    )
+
+            for entry in adopted.values():
                 day = entry["day"]
                 if year in horizons and day >= horizons[year] and day not in chosen:
                     # Above the block's first date the block is the whole truth,
