@@ -7,11 +7,13 @@ import pytest
 
 from scrapers.agencies.ops_board_of_education import (
     OpsBoardOfEducation,
-    best_title,
+    is_committee,
     canonical_name,
     external_id_for,
 )
 from scrapers.base import ScraperError
+from scrapers.agencies.ops_board_of_education import BOARD_TITLE_RE
+from scrapers.sources.finalsite import parse_events
 from scrapers.sources.sparq import parse_listing
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -37,6 +39,19 @@ def drop_row(meeting_id):
     for row in soup.find_all("tr"):
         if f"meeting={meeting_id}" in str(row):
             row.decompose()
+    return str(soup)
+
+
+def make_all_day(series_id):
+    """The calendar with one event's <time> removed, leaving the rest timed.
+    That is the realistic shape -- an all-day entry among ordinary ones."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(CALENDAR, "html.parser")
+    for node in soup.select(".fsCalendarEvent"):
+        link = node.select_one(".fsCalendarEventLink")
+        if link and link.get("data-occur-id", "").startswith(f"{series_id}_"):
+            node.select_one("time.fsStartTime").decompose()
     return str(soup)
 
 
@@ -70,7 +85,7 @@ def fetch_with(listing=LISTING, calendar=NO_CALENDAR, **kwargs):
 def test_the_shared_sparq_parser_reads_this_portal_too():
     """Lincoln and Omaha run the same system at different organization
     numbers, which is why the parser lives in sources/."""
-    assert len(parse_listing(LISTING)) == 11
+    assert len(parse_listing(LISTING)) == 12
 
 
 def test_pulls_date_and_time_from_the_heading():
@@ -129,21 +144,13 @@ def test_maps_the_portals_meeting_types_onto_the_api_vocabulary():
     assert by_id["ops-2024-09-20-1700"] == "SPECIAL"
 
 
-def test_a_committee_is_a_workshop():
-    """OPS calls it "Unit", which no other district in this project uses."""
-    _, meetings = fetch_with(**WIDE)
-    committees = [m for m in meetings if "Civics" in m.name]
-    assert committees
-    assert all(m.meeting_type == "WORKSHOP" for m in committees)
-
-
 def test_an_unmapped_type_is_kept_as_regular_with_a_warning(caplog):
     # The label and its value sit either side of a </b> in the markup.
     html = re.sub(r"(Meeting Type:\s*</b>\s*)Regular", r"\1Unheardof", LISTING, count=1)
     assert "Unheardof" in html, "the fixture's markup changed shape"
 
     _, meetings = fetch_with(html, **WIDE)
-    assert len(meetings) == 11  # nothing dropped
+    assert len(meetings) == 8  # nothing dropped beyond the committees
     assert "unmapped meeting type" in caplog.text
 
 
@@ -192,48 +199,47 @@ def test_a_dead_portal_raises_a_scraper_error():
             OpsBoardOfEducation().fetch()
 
 
-# --- naming a committee from its type bracket --------------------------------
+# --- committees are left out ------------------------------------------------
 
 
-def test_a_title_that_already_names_the_committee_is_kept():
-    assert best_title(
-        {"title": "American Civics Committee Meeting",
-         "type_detail": "American Civics Committee"}
-    ) == "American Civics Committee Meeting"
-
-
-def test_a_bracket_that_corrects_a_typo_in_the_title_wins():
-    """This row reads "American Committee Meeting" -- the bracket supplies the
-    word the title dropped."""
-    assert best_title(
-        {"title": "American Committee Meeting",
-         "type_detail": "American Civics Committee"}
-    ) == "American Civics Committee"
-
-
-def test_a_bracket_beats_a_title_that_says_nothing():
-    assert best_title(
-        {"title": "Committee Meeting", "type_detail": "American Civics Committee"}
-    ) == "American Civics Committee"
-
-
-def test_a_fuller_title_survives_a_shorter_bracket():
-    assert best_title(
-        {"title": "Ad Hoc Student Discipline Hearing Committee Meeting",
-         "type_detail": "Ad Hoc Student Discipline Hearing"}
-    ) == "Ad Hoc Student Discipline Hearing Committee Meeting"
-
-
-def test_an_empty_bracket_changes_nothing():
-    assert best_title({"title": "Board of Education Workshop", "type_detail": ""}) == (
-        "Board of Education Workshop"
-    )
-
-
-def test_the_typo_row_reaches_the_platform_corrected():
+def test_committee_meetings_are_left_out():
+    """The editors do not want them."""
     _, meetings = fetch_with(**WIDE)
-    names = {m.starts_at.date(): m.name for m in meetings}
-    assert names[date(2025, 3, 24)] == "Omaha Public Schools American Civics Committee"
+    assert not [m for m in meetings if "Committee" in m.name]
+    assert not [m for m in meetings if "Civics" in m.name]
+
+
+def test_a_committee_is_matched_on_its_name_not_the_portals_type():
+    """SPARQ files committees under "Unit", but so is the retirement board, and
+    the Ad Hoc discipline committee also appears typed Hearing and Special."""
+    assert is_committee("American Civics Committee Meeting")
+    assert is_committee("Ad Hoc Student Discipline Hearing Committee of the Board")
+    assert not is_committee(
+        "Omaha School Employees' Retirement System Board of Trustees Meeting"
+    )
+    assert not is_committee("Board of Education Workshop")
+
+
+def test_a_badly_titled_committee_is_caught_by_its_type_bracket():
+    """One row is titled just "Committee Meeting" and another "American
+    Committee Meeting", so the bracket is the field that identifies the body."""
+    assert is_committee("Special Meeting", "American Civics Committee")
+
+
+def test_a_separate_board_filed_under_the_committee_type_is_kept():
+    """37 of the 54 "Unit" rows are the retirement board, which is its own
+    board rather than a committee of this one -- so filtering on the portal's
+    type would have dropped it."""
+    _, meetings = fetch_with(**WIDE)
+    kept = [m for m in meetings if "Retirement System" in m.name]
+    assert len(kept) == 1
+    assert kept[0].meeting_type == "WORKSHOP"  # the portal types it "Unit"
+
+
+def test_a_committee_on_the_calendar_is_left_out_too():
+    html = CALENDAR.replace("Board Workshop", "American Civics Committee")
+    _, meetings = fetch_with(calendar=html, **WIDE)
+    assert not [m for m in meetings if m.external_id == "ops-2026-09-28-1800"]
 
 
 # --- the district calendar ---------------------------------------------------
@@ -284,26 +290,26 @@ def test_school_events_are_left_off():
     assert not [m for m in meetings if "Open House" in m.name]
 
 
-def test_a_committee_on_the_calendar_is_caught_without_the_word_board():
-    """"American Civics Committee" is a board committee whose calendar title
-    says nothing about a board -- the "committee" half of the filter is what
-    catches it."""
-    html = CALENDAR.replace("Board Workshop", "American Civics Committee")
-    _, meetings = fetch_with(calendar=html, **WIDE)
-    assert [m for m in meetings if m.external_id == "ops-2026-09-28-1800"]
-
-
 def test_an_all_day_calendar_entry_is_skipped_not_given_a_midnight():
-    html = CALENDAR.replace("fsStartTime", "fsNotATime")
-    scraper, meetings = fetch_with(calendar=html, **WIDE)
+    """Only the Sep 21 meeting loses its time; the rest stay timed, so this
+    fails if all-day handling swallows the whole month."""
+    scraper, meetings = fetch_with(calendar=make_all_day("1303"), **WIDE)
+
     assert not [m for m in meetings if m.starts_at.date() == date(2026, 9, 21)]
     assert any("no start time" in reason for reason in scraper.skipped)
+    # the other calendar-only meeting that month is unaffected
+    assert [m for m in meetings if m.external_id == "ops-2026-09-28-1800"]
 
 
 def test_a_calendar_with_no_board_events_raises_rather_than_going_quiet():
     """Losing the board's events would otherwise look exactly like "no future
     meetings", which is the state this second source exists to fix."""
-    html = CALENDAR.replace("Board", "Chess Club").replace("Committee", "Chess Club")
+    html = CALENDAR
+    for title in ("Board Budget Hearing", "Board Meeting", "Board Workshop"):
+        html = html.replace(title, "Chess Club")
+    assert len(parse_events(html)) == len(parse_events(CALENDAR)), "events survive"
+    assert not [e for e in parse_events(html) if BOARD_TITLE_RE.search(e.title)]
+
     with pytest.raises(ScraperError, match="calendar element"):
         fetch_with(calendar=html, **WIDE)
 

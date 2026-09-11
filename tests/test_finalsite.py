@@ -57,11 +57,24 @@ def test_the_series_id_is_the_number_in_front_of_the_occurrence_id():
 
 def test_an_all_day_event_has_no_time():
     """These have no <time> element at all. Reading one as midnight would put a
-    made-up hour in front of an editor."""
-    stripped = MONTH.replace("fsStartTime", "fsNotATime")
-    events = parse_events(stripped)
-    assert events and all(e.all_day for e in events)
-    assert all(e.starts_at is None for e in events)
+    made-up hour in front of an editor.
+
+    Only one event loses its time here -- an all-day entry among timed ones is
+    the shape that actually turns up, and stripping the whole month would pass
+    even if the distinction were not being drawn at all."""
+    from bs4 import BeautifulSoup
+
+    soup = BeautifulSoup(MONTH, "html.parser")
+    for node in soup.select(".fsCalendarEvent"):
+        link = node.select_one(".fsCalendarEventLink")
+        if link and link.get("data-occur-id", "").startswith("1303_"):
+            node.select_one("time.fsStartTime").decompose()
+
+    events = parse_events(str(soup))
+    all_day = [e for e in events if e.all_day]
+    assert len(all_day) == 1
+    assert all_day[0].starts_at is None
+    assert len([e for e in events if not e.all_day]) == 3
 
 
 def test_an_unreadable_timestamp_drops_the_event_rather_than_crashing():

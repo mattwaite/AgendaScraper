@@ -19,6 +19,12 @@ and three "Board of Education Town Hall" events, which SPARQ does not carry at
 all -- those are kept, since a town hall is a board event a reporter may be
 sent to, and the API does not require an agenda.
 
+Committee meetings are left out at the editors' request -- see COMMITTEE_RE
+for why that is matched on the name rather than the portal's meeting type. The
+Omaha School Employees' Retirement System Board of Trustees is *kept*: it is a
+separate board rather than a committee of this one, and it accounts for 37 of
+the 54 rows the portal files under the same type as the committees.
+
 Unlike Lincoln, no ESU folding is needed here: OPS names the combined body in
 one title already, "Omaha Public Schools Board of Education and Educational
 Service Unit 19 Board Meeting", so there is nothing to collapse.
@@ -87,14 +93,30 @@ TITLE_TYPES = (
 
 # Which calendar entries belong to the board. The district calendar is mostly
 # school events -- open houses, graduations, days off -- so this is a filter
-# rather than a sieve.
+# rather than a sieve. Checked against 140 calendar events over 16 months: no
+# entry without "board" in its title was a board meeting.
+BOARD_TITLE_RE = re.compile(r"(?i)\bboard\b")
+
+# Committee meetings are left out at the editors' request.
 #
-# Both words are load-bearing. "American Civics Committee" is a board committee
-# whose calendar title says nothing about a board, and only "committee" catches
-# it. The gap this leaves is a board body named with neither word: SPARQ types
-# some of its units with empty brackets, so unnamed ones do exist, and one of
-# those would be invisible here until SPARQ posts its agenda a week out.
-BOARD_TITLE_RE = re.compile(r"(?i)\bboard\b|\bcommittee\b")
+# Matched on the name rather than the portal's type, which does not mean what
+# it looks like. SPARQ files these under "Unit", but 37 of its 54 Unit rows are
+# the Omaha School Employees' Retirement System Board of Trustees -- a separate
+# pension board, not a committee of this one -- while the Ad Hoc Student
+# Discipline Hearing Committee turns up typed Unit, Hearing *and* Special
+# across the archive. Filtering on the type would drop the wrong 37 and keep
+# the wrong 8.
+#
+# The bracket qualifying the type is checked as well as the title. Every
+# committee row observed says "Committee" in its title, but one is titled just
+# "Committee Meeting" and another "American Committee Meeting", so the source
+# is clearly not careful with these names, and the bracket is the field that
+# actually identifies the body.
+COMMITTEE_RE = re.compile(r"(?i)\bcommittee\b")
+
+
+def is_committee(title: str, detail: str = "") -> bool:
+    return bool(COMMITTEE_RE.search(title) or COMMITTEE_RE.search(detail))
 
 NAME_PREFIX = "Omaha Public Schools"
 
@@ -127,26 +149,6 @@ def classify_title(title: str) -> str:
         if pattern.search(title):
             return meeting_type
     return "REGULAR"
-
-
-def best_title(entry: dict) -> str:
-    """The better of a SPARQ row's title and the committee name qualifying it.
-
-    Usually the title, which is normally the fuller of the two -- "Ad Hoc
-    Student Discipline Hearing Committee Meeting" against a bracket that stops
-    at "Hearing".
-
-    The exception is when the bracket names a committee the title does not.
-    Two real rows need this: one titled "American Committee Meeting" where the
-    bracket reads "American Civics Committee" and supplies the missing word,
-    and one titled simply "Committee Meeting", which tells an editor nothing at
-    all. Containment rather than length is the test -- by length the typo row
-    keeps its typo, since "American Committee Meeting" is the longer string.
-    """
-    title, detail = entry["title"].strip(), entry.get("type_detail", "").strip()
-    if detail and detail.lower() not in title.lower():
-        return detail
-    return title
 
 
 class OpsBoardOfEducation(BaseScraper):
@@ -213,7 +215,11 @@ class OpsBoardOfEducation(BaseScraper):
         Matched on the whole slot -- see the note in the module docstring about
         why this differs from the Lincoln schools scraper.
         """
-        board = [e for e in events if BOARD_TITLE_RE.search(e.title)]
+        board = [
+            e
+            for e in events
+            if BOARD_TITLE_RE.search(e.title) and not is_committee(e.title)
+        ]
         if events and not board:
             raise ScraperError(
                 f"No board meetings among {len(events)} calendar events at "
@@ -255,6 +261,8 @@ class OpsBoardOfEducation(BaseScraper):
         for entry in sparq.parse_listing(html, LISTING_URL):
             if not self._in_window(entry["starts_at"].date(), today):
                 continue
+            if is_committee(entry["title"], entry.get("type_detail", "")):
+                continue
 
             external_id = external_id_for(entry["starts_at"])
             if (existing := by_id.get(external_id)) is not None:
@@ -282,7 +290,7 @@ class OpsBoardOfEducation(BaseScraper):
                 meeting_type = "REGULAR"
 
             meeting = Meeting(
-                name=canonical_name(best_title(entry)),
+                name=canonical_name(entry["title"]),
                 starts_at=entry["starts_at"],
                 external_id=external_id,
                 location=entry["location"] or None,
