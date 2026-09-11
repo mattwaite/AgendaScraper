@@ -13,11 +13,13 @@ Currently implemented:
 | Lancaster County Board of Commissioners | `lancaster_county_commissioners` | CivicPlus Agenda Center + agenda PDFs + iCalendar feed |
 | Lincoln Public Schools Board of Education | `lps_board_of_education` | SPARQ Data portal + district calendar API |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | lincoln.ne.gov calendar + landing page |
+| Omaha Public Schools Board of Education | `ops_board_of_education` | SPARQ Data portal + Finalsite district calendar |
 
-All four Lincoln agencies now publish a forward schedule somewhere separate
-from their agendas — two OpenCities calendar pages on lincoln.ne.gov, an
-iCalendar feed for the county, and a Thrillshare events API for the school
-district. Granicus, the Agenda Center and SPARQ each list a meeting only once
+All four Lincoln agencies are done, and Omaha has begun. Every one of them
+publishes its forward schedule somewhere separate from its agendas — two
+OpenCities calendar pages on lincoln.ne.gov, an iCalendar feed for the county,
+a Thrillshare events API for Lincoln's schools and a Finalsite calendar for
+Omaha's. Granicus, the Agenda Center and SPARQ each list a meeting only once
 its agenda is posted, so each of those scrapers reads a second source for the
 meetings still to come.
 
@@ -61,7 +63,7 @@ scraped 12 / created 3 / adopted 0 / updated 1 / duplicate 8 / conflict 0 / fail
 ```
 
 Every meeting is submitted on every run and the platform decides what to do with
-it, keyed on the meeting's `externalId` (the Granicus `clip_id`):
+it, keyed on the meeting's `externalId`:
 
 - `created` — new to the platform.
 - `adopted` — matched a meeting submitted before `externalId` existed, and
@@ -72,6 +74,9 @@ it, keyed on the meeting's `externalId` (the Granicus `clip_id`):
 - `conflict` — a `409`, meaning this meeting's `externalId` has changed since it
   was filed. Needs a human; see the recovery section of
   [`docs/api-notes.md`](docs/api-notes.md).
+- `stranded` — only shown when non-zero: the platform holds a record over these
+  dates that this run did not produce, usually a meeting that moved. Reported,
+  not deleted; see the recovery section of [`docs/api-notes.md`](docs/api-notes.md).
 - `skipped` — only shown when non-zero: the source didn't give enough to build a
   meeting (Lancaster, for instance, skips a meeting whose agenda has no start
   time rather than inventing one). Each reason is logged as a warning.
@@ -145,7 +150,7 @@ deduplication, and submission.
 | `scrapers/base.py` | `BaseScraper` — the contract a scraper implements |
 | `scrapers/run.py` | CLI: dedup, submit, report |
 | `scrapers/agencies/` | One module per government body |
-| `scrapers/sources/` | Readers for a publishing platform, reusable across agencies (OpenCities calendars, CivicPlus iCalendar feeds, Thrillshare district calendars) |
+| `scrapers/sources/` | Readers for a publishing platform, reusable across agencies (OpenCities, CivicPlus iCalendar, SPARQ meeting portals, Thrillshare and Finalsite district calendars) |
 | `docs/api-notes.md` | Verified API behavior; read before adding a scraper |
 | `tools/verify_upsert.py` | Proves upsert works, against the sandbox agency |
 

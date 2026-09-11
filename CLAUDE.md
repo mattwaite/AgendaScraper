@@ -1,8 +1,9 @@
 # Working in this repo
 
 Scrapers that pull government meeting schedules into the NE Civic Newsroom API,
-where Flatwater Free Press editors assign reporters to cover them. Four Lincoln
-agencies are done; nine Omaha ones are next.
+where Flatwater Free Press editors assign reporters to cover them. The four
+Lincoln agencies are done, as is Omaha Public Schools; eight Omaha bodies
+remain.
 
 **Read `docs/api-notes.md` before touching the API, and README.md's "Adding a
 scraper" before writing one.** Both record behavior that was established
@@ -19,11 +20,13 @@ reason every scraper here reads two sources.
 
 So: an agency that appears to have no future meetings almost certainly has them
 somewhere else. Go and find the second source before concluding otherwise. It
-has been an OpenCities calendar page, a CivicPlus iCalendar feed, and a
-Thrillshare events API so far.
+has been an OpenCities calendar page, a CivicPlus iCalendar feed, a Thrillshare
+events API and a Finalsite calendar element so far.
 
 Check `scrapers/sources/` first — those readers are agency-agnostic and one of
-them likely already covers a new site's platform.
+them likely already covers a new site's platform. Omaha Public Schools needed
+no new agenda parser at all: it runs the same SPARQ portal as Lincoln's, and
+`sources/sparq.py` read all 462 of its rows unchanged.
 
 ## Verify a second source against the first before trusting it
 
