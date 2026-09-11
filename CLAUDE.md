@@ -2,15 +2,16 @@
 
 Scrapers that pull government meeting schedules into the NE Civic Newsroom API,
 where Flatwater Free Press editors assign reporters to cover them. The four
-Lincoln agencies are done, as is Omaha Public Schools; eight Omaha bodies
-remain.
+Lincoln agencies are done, as are Omaha Public Schools, Sarpy County, the
+Inland Port Authority and OPPD; five Omaha bodies remain, three of them behind
+an Akamai block awaiting the client's escalation.
 
 **Read `docs/api-notes.md` before touching the API, and README.md's "Adding a
 scraper" before writing one.** Both record behavior that was established
 empirically and is not guessable from the code. The rest of this file is the
 things those two don't say.
 
-## The pattern that has held for all four agencies
+## The pattern most of these agencies follow
 
 The system holding the **agendas** and the system holding the **schedule** are
 different systems. Granicus, CivicPlus Agenda Center and SPARQ each list a
@@ -27,6 +28,15 @@ Two agencies break the pattern: Sarpy's CivicWeb service and the Inland Port
 Authority's meetings page each return the archive and the schedule together, so
 they need a single source. Check for that before building a merge — it is
 simpler, and it changes the right `external_id`.
+
+OPPD breaks it the other way and needs three. The lesson worth carrying is that
+**a body governed by bylaws usually has to adopt its own schedule, and the
+document that does it is a source.** OPPD's page lists only the meetings left
+in the current year, so in December it approaches empty — but Article IV makes
+the board adopt next year's schedule every September, and that resolution PDF
+carries a date, a time and a place for all twelve months. It was the only way
+to see past the end of the year. Before settling for a thin schedule page, look
+in the archive for the meeting where the schedule itself was approved.
 
 Where a source gives a date but no time, prefer reading the real time from the
 agenda and standing in the body's published hour until that exists, rather than

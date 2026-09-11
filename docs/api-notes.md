@@ -78,6 +78,7 @@ a new record and strands the old one.
 | OPS Board of Education | `ops-{date}-{HHMM}` | 51 of 409 dates carry more than one meeting |
 | Sarpy County | `sarpy-{portal id}` | One source covers past and future, so the id is safe — and beats a date key |
 | Omaha Inland Port Authority | `oipa-{date}` | One meeting per date; the time is *excluded* on purpose — see below |
+| OPPD Board of Directors | `oppd-{date}` | At most one meeting a month; the time is *excluded* for the same reason |
 
 Where a scheme cannot represent two meetings that collide, the scraper skips
 the second with a warning rather than silently overwriting the first.
@@ -88,6 +89,13 @@ yet is filed at the board's standing 9:00 AM. Putting that time in the key
 would strand the record every time an agenda posted a non-standard hour — the
 August 2026 meeting was at 4:30 — turning a routine correction into a
 duplicate. The date alone is the stable part.
+
+OPPD is the same rule from the other direction. Its page says "Meetings start
+at 5 p.m. unless otherwise noted," and the exception is real — the board met at
+6:00 on January 18, 2024. There the time is not defaulted so much as *supplied
+by a different document than the date*, and a later-arriving agenda can revise
+it. Either way it is a field this scraper decides rather than reads off the
+schedule, so it stays out of the key.
 
 ### The failure the upsert cannot see: stranded records
 

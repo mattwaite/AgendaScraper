@@ -15,6 +15,7 @@ Currently implemented:
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | lincoln.ne.gov calendar + landing page |
 | Omaha Public Schools Board of Education | `ops_board_of_education` | SPARQ Data portal + Finalsite district calendar |
 | Omaha Inland Port Authority | `omaha_port_authority` | omahaipa.com meetings page + agenda PDFs |
+| Omaha Public Power District Board of Directors | `oppd_board_of_directors` | oppd.com schedule block + adopted schedule resolution + agenda PDFs |
 | Sarpy County Board of Commissioners | `sarpy_county_commissioners` | CivicWeb portal meetings service |
 
 All four Lincoln agencies are done, and Omaha has begun. Most of them publish
@@ -26,6 +27,11 @@ its agenda is posted, so each of those scrapers reads a second source for the
 meetings still to come. Sarpy County and the Inland Port Authority are the
 exceptions: each publishes one page carrying the archive and the schedule
 together.
+
+OPPD goes the other way and needs three. Its page lists only the meetings left
+in the current year and gives no times at all, so the times — and the whole of
+next year — come from the schedule the board adopts by resolution every
+September, and the agenda PDF settles the imminent meeting.
 
 Each scraper publishes only its agency's apex body — the board or council
 itself, not its committees and not a separate body that meets under the same
