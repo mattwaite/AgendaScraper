@@ -22,6 +22,14 @@ front of an editor. The run says how many were passed over.
 The Public Building Commission also appears on this calendar. It is a separate
 body, not this agency, so it is left alone.
 
+The Board of Equalization **is** published, and that is a deliberate exception
+to the apex-board rule the other scrapers follow -- do not "fix" it. Every
+agency here publishes only its governing body and not the committees beneath
+it, but equalization is not beneath this one: it is the same five commissioners
+in the same room sitting under a different statutory hat, and the valuation
+protests it hears are worth a reporter on their own. Confirmed with the editors
+on 2026-09-11.
+
 ## The Agenda Center half
 
 A different shape of source from Lincoln's Granicus portal, in one way that
