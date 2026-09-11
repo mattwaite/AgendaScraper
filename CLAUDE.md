@@ -23,6 +23,10 @@ somewhere else. Go and find the second source before concluding otherwise. It
 has been an OpenCities calendar page, a CivicPlus iCalendar feed, a Thrillshare
 events API and a Finalsite calendar element so far.
 
+One agency breaks the pattern: Sarpy's CivicWeb service returns the archive and
+the schedule together, so it needs a single source. Check for that before
+building a merge — it is simpler, and it changes the right `external_id`.
+
 Check `scrapers/sources/` first — those readers are agency-agnostic and one of
 them likely already covers a new site's platform. Omaha Public Schools needed
 no new agenda parser at all: it runs the same SPARQ portal as Lincoln's, and
@@ -44,6 +48,9 @@ the difference differently and some do not mark it at all:
   separates them, and one committee's title omits the word "Committee".
 - Lancaster works the other way round, from an allowlist of the two series it
   recognises, so anything new is excluded until someone adds it.
+- Sarpy's portal types are close but not reliable: four equalization meetings
+  are filed under the legacy board type, so its meeting *type* is read off the
+  name even though inclusion is decided by type.
 
 So: enumerate the distinct titles in the archive before writing the filter,
 count what each rule drops, and put the counts in the module docstring. Both

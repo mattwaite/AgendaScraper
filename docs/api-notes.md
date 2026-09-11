@@ -56,12 +56,18 @@ Two consequences worth knowing:
 
 ### Choosing an externalId
 
-Every agency here reads two sources — one with the agendas, one with the
+Most agencies here read two sources — one with the agendas, one with the
 forward schedule — so the id has to be something *both* sources can produce. A
-source's own meeting id is therefore the wrong choice, however stable it looks:
-the record would change identity the moment the meeting moved from the calendar
-to the agenda system, orphaning the first copy. Each scheme below is the
-narrowest key the two sources agree on.
+source's own meeting id is therefore usually the wrong choice, however stable
+it looks: the record would change identity the moment the meeting moved from
+the calendar to the agenda system, orphaning the first copy. Each two-source
+scheme below is the narrowest key those sources agree on.
+
+Sarpy County is the exception that shows what the rule is for. Its CivicWeb
+service returns the archive *and* the schedule in one call, so nothing can move
+between systems, and the portal's own id is the better key: it survives a
+reschedule and updates the record in place, where every date-derived key files
+a new record and strands the old one.
 
 | Agency | Scheme | Why not narrower |
 |---|---|---|
@@ -70,6 +76,7 @@ narrowest key the two sources agree on.
 | LPS Board of Education | `lps-{date}-{HHMM}` | 170 of 489 dates carry more than one meeting |
 | Planning Commission | `llcpc-{date}` | One meeting per date |
 | OPS Board of Education | `ops-{date}-{HHMM}` | 51 of 409 dates carry more than one meeting |
+| Sarpy County | `sarpy-{portal id}` | One source covers past and future, so the id is safe — and beats a date key |
 
 Where a scheme cannot represent two meetings that collide, the scraper skips
 the second with a warning rather than silently overwriting the first.

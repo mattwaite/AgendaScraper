@@ -14,14 +14,16 @@ Currently implemented:
 | Lincoln Public Schools Board of Education | `lps_board_of_education` | SPARQ Data portal + district calendar API |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | lincoln.ne.gov calendar + landing page |
 | Omaha Public Schools Board of Education | `ops_board_of_education` | SPARQ Data portal + Finalsite district calendar |
+| Sarpy County Board of Commissioners | `sarpy_county_commissioners` | CivicWeb portal meetings service |
 
-All four Lincoln agencies are done, and Omaha has begun. Every one of them
-publishes its forward schedule somewhere separate from its agendas — two
-OpenCities calendar pages on lincoln.ne.gov, an iCalendar feed for the county,
-a Thrillshare events API for Lincoln's schools and a Finalsite calendar for
+All four Lincoln agencies are done, and Omaha has begun. Most of them publish
+their forward schedule somewhere separate from their agendas — two OpenCities
+calendar pages on lincoln.ne.gov, an iCalendar feed for the county, a
+Thrillshare events API for Lincoln's schools and a Finalsite calendar for
 Omaha's. Granicus, the Agenda Center and SPARQ each list a meeting only once
 its agenda is posted, so each of those scrapers reads a second source for the
-meetings still to come.
+meetings still to come. Sarpy County is the exception: its CivicWeb service
+returns the archive and the schedule in one call.
 
 Each scraper publishes only its agency's apex body — the board or council
 itself, not its committees and not a separate body that meets under the same
@@ -113,14 +115,17 @@ before it can duplicate the rest.
    never drift** — it is how the platform recognizes a meeting it already has.
    Meeting names, by contrast, are free to change.
 
-   Do *not* use the source system's own meeting id, however stable it looks.
-   Every agency here reads two sources, and only one of them has that id — the
-   record would change identity the moment the meeting moved from the calendar
-   to the agenda system, stranding the first copy. Build the id from what both
-   sources can produce, and make it the narrowest key that still tells two
-   meetings apart: a date is enough for the council, LPS needs the time too.
-   See "Choosing an externalId" in `docs/api-notes.md` for the schemes and the
-   collision counts behind them.
+   If the agency needs **two** sources, do *not* use either system's own
+   meeting id, however stable it looks — only one source has it, so the record
+   would change identity the moment the meeting moved from the calendar to the
+   agenda system, stranding the first copy. Build the id from what both sources
+   can produce, and make it the narrowest key that still tells two meetings
+   apart: a date is enough for the council, LPS needs the time too.
+
+   If **one** source covers both the archive and the schedule, as Sarpy's
+   does, use that source's own id: it survives a reschedule, where a key built
+   from the start time files a new record and strands the old one. See
+   "Choosing an externalId" in `docs/api-notes.md`.
 
    Name meetings from the source's own titles where those are specific (LPS
    distinguishes work sessions, budget hearings and named committees), and from
@@ -159,7 +164,7 @@ deduplication, and submission.
 | `scrapers/base.py` | `BaseScraper` — the contract a scraper implements |
 | `scrapers/run.py` | CLI: dedup, submit, report |
 | `scrapers/agencies/` | One module per government body |
-| `scrapers/sources/` | Readers for a publishing platform, reusable across agencies (OpenCities, CivicPlus iCalendar, SPARQ meeting portals, Thrillshare and Finalsite district calendars) |
+| `scrapers/sources/` | Readers for a publishing platform, reusable across agencies (OpenCities, CivicPlus iCalendar, CivicWeb, SPARQ meeting portals, Thrillshare and Finalsite district calendars) |
 | `docs/api-notes.md` | Verified API behavior; read before adding a scraper |
 | `tools/verify_upsert.py` | Proves upsert works, against the sandbox agency |
 
