@@ -58,16 +58,14 @@ import re
 from datetime import date, datetime, timedelta
 
 import requests
-from bs4 import BeautifulSoup
 
 from ..base import BaseScraper, ScraperError
 from ..meeting import CENTRAL, Meeting
-from ..sources import thrillshare
+from ..sources import sparq, thrillshare
 
 log = logging.getLogger(__name__)
 
-BASE_URL = "https://meeting.sparqdata.com"
-LISTING_URL = f"{BASE_URL}/Public/Organization/89"
+LISTING_URL = sparq.listing_url(89)
 CALENDAR_URL = (
     "https://lincolnpublicschools.thrillshare.com/api/v4/o/31429/cms/events"
     "?locale=en&page_no=1"
@@ -82,15 +80,30 @@ _FAR_FUTURE = datetime.max.replace(tzinfo=CENTRAL)  # sorts all-day events last
 DAYS_BACK = 7
 DAYS_FORWARD = 400
 
-# "September 8, 2026 at 6:00 PM - Board of Education Regular Meeting"
-HEADING_RE = re.compile(
-    r"([A-Z][a-z]+\s+\d{1,2},\s+\d{4})\s+at\s+(\d{1,2}:\d{2}\s*[AP]M)\s*[-–]\s*(.+)"
-)
-MEETING_TYPE_RE = re.compile(r"Meeting Type:\s*(\w+)")
-MEETING_ID_RE = re.compile(r"[?&]meeting=(\d+)")
-
 # "ESU 18", "ESU18" and "ESU #18" all appear across the two sources.
 ESU_RE = re.compile(r"(?i)\bESU\s*#?\s*18\b")
+
+# Only the apex board. Editors want the Board of Education itself -- not its
+# committees, and not the other boards that meet under the district's roof.
+# This drops 92 of the portal's 701 rows.
+#
+# Three of the terms are not "committee" and are each load-bearing:
+#
+#   interlocal / SSKI  The Safe & Successful Kids Interlocal Board, a separate
+#                      body, written eight different ways across the archive --
+#                      including once as plain "SSKI Board of Directors".
+#   governmental       The governmental relations committee, whose title drops
+#     relations        the word "Committee" on one date.
+#
+# ESU 18 is deliberately *not* here. It is the same board, in the same room, on
+# the same night -- see the note above on folding it in.
+NOT_THE_BOARD = re.compile(
+    r"(?i)\bcommittee\b"
+    r"|\binterlocal\b"
+    r"|\bSSKIB?\b"
+    r"|safe\s*(?:&|and)\s*successful\s*kids"
+    r"|governmental\s+relations"
+)
 
 # The portal's own vocabulary, mapped onto the five types the API accepts.
 # Everything it calls a committee or a working session lands on WORKSHOP.
@@ -145,18 +158,6 @@ def classify_title(title: str) -> str:
     return "REGULAR"
 
 
-def clean_location(cell) -> str:
-    """Flatten the address cell, dropping the "[ map it ]" link."""
-    for link in cell.find_all("a"):
-        link.decompose()
-    parts = [
-        " ".join(part.split())
-        for part in cell.get_text(separator="\n").split("\n")
-        if part.strip() and part.strip() not in "[]"
-    ]
-    return ", ".join(parts).replace(" ,", ",").strip(" ,")
-
-
 def clean_venue(venue: str) -> str:
     """The calendar's venue string, punctuated like SPARQ's address.
 
@@ -171,58 +172,6 @@ def clean_venue(venue: str) -> str:
     venue = re.sub(r"\s*-\s+", ", ", venue)
     venue = re.sub(r"(?i),\s*USA\s*$", "", venue)
     return " ".join(venue.split()).strip(" ,")
-
-
-def parse_listing(html: str) -> list[dict]:
-    """One entry per row of the meetings table."""
-    soup = BeautifulSoup(html, "html.parser")
-    table = soup.find("table")
-    if not table:
-        raise ScraperError(
-            f"No meetings table at {LISTING_URL} -- the page layout has "
-            "probably changed."
-        )
-
-    entries = []
-    for row in table.find_all("tr"):
-        cells = row.find_all("td")
-        if len(cells) < 3:
-            continue  # header
-
-        heading = " ".join(cells[0].get_text().split())
-        match = HEADING_RE.search(heading)
-        if not match:
-            continue
-        try:
-            starts_at = datetime.strptime(
-                f"{match.group(1)} {match.group(2)}", "%B %d, %Y %I:%M %p"
-            ).replace(tzinfo=CENTRAL)
-        except ValueError:
-            continue
-
-        # The title runs up to the "Meeting Type:" label that follows it.
-        title = MEETING_TYPE_RE.split(match.group(3))[0].strip(" -–")
-        type_match = MEETING_TYPE_RE.search(heading)
-        source_type = type_match.group(1) if type_match else ""
-
-        link = cells[2].find("a", href=MEETING_ID_RE)
-        if not link:
-            continue
-        meeting_id = MEETING_ID_RE.search(link["href"]).group(1)
-
-        entries.append(
-            {
-                "starts_at": starts_at,
-                "title": title,
-                "source_type": source_type,
-                "meeting_id": meeting_id,
-                "agenda_url": BASE_URL + link["href"]
-                if link["href"].startswith("/")
-                else link["href"],
-                "location": clean_location(cells[1]),
-            }
-        )
-    return entries
 
 
 class LpsBoardOfEducation(BaseScraper):
@@ -272,7 +221,11 @@ class LpsBoardOfEducation(BaseScraper):
         the calendar's copy would never go away. A disagreement is logged
         rather than resolved: nothing yet shows which source updates first.
         """
-        board = [e for e in events if e.section == CALENDAR_SECTION]
+        board = [
+            e
+            for e in events
+            if e.section == CALENDAR_SECTION and not NOT_THE_BOARD.search(e.title)
+        ]
         if events and not board:
             raise ScraperError(
                 f"No {CALENDAR_SECTION!r} events among {len(events)} at "
@@ -328,7 +281,7 @@ class LpsBoardOfEducation(BaseScraper):
         by_id: dict[str, Meeting] = {}
         titles: dict[str, str] = {}  # external_id -> the winning source title
 
-        for entry in parse_listing(html):
+        for entry in sparq.parse_listing(html, LISTING_URL):
             if not self._in_window(entry["starts_at"].date(), today):
                 continue
             if not self._wanted(entry):
@@ -407,10 +360,9 @@ class LpsBoardOfEducation(BaseScraper):
         )
 
     def _wanted(self, entry: dict) -> bool:
-        """Which of the portal's meetings belong to this agency.
+        """Whether this row is the board itself rather than some other body.
 
-        Everything, for now: the board's own meetings and its committees. ESU 18
-        is not filtered here -- it is folded into the meeting it shares a slot
-        with, in `_fold`.
+        ESU 18 is not filtered here -- it is the same board and is folded into
+        the meeting it shares a slot with, in `_fold`.
         """
-        return True
+        return not NOT_THE_BOARD.search(entry["title"])

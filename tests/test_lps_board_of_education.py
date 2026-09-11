@@ -11,9 +11,10 @@ from scrapers.agencies.lps_board_of_education import (
     canonical_name,
     clean_venue,
     external_id_for,
-    parse_listing,
 )
+from scrapers.agencies.lps_board_of_education import NOT_THE_BOARD
 from scrapers.base import ScraperError
+from scrapers.sources.sparq import parse_listing
 
 FIXTURES = Path(__file__).parent / "fixtures"
 LISTING = (FIXTURES / "lps_sparq_meetings.html").read_text()
@@ -108,10 +109,12 @@ def test_the_key_is_the_date_and_the_time():
     assert external_id_for(entry_for("468109")["starts_at"]) == "lps-2021-05-05-0900"
 
 
-def test_a_morning_committee_and_an_evening_meeting_both_survive():
-    """The case date-only keying would lose. Moved here from 2021 so the two
-    share a day: a 9 AM committee and the 6 PM regular meeting."""
-    html = LISTING.replace("May 5, 2021 at 9:00 AM", "September 8, 2026 at 9:00 AM", 1)
+def test_a_morning_session_and_an_evening_meeting_both_survive():
+    """The case date-only keying would lose. The work session is moved here
+    from 2024 so the two share a day: 9 AM and the 6 PM regular meeting."""
+    html = LISTING.replace(
+        "January 29, 2024 at 4:30 PM", "September 8, 2026 at 9:00 AM", 1
+    )
     _, meetings = fetch_with(html, **WIDE)
 
     sep8 = sorted(
@@ -122,7 +125,7 @@ def test_a_morning_committee_and_an_evening_meeting_both_survive():
         "lps-2026-09-08-0900",
         "lps-2026-09-08-1800",
     ]
-    assert "Finance Committee" in sep8[0].name
+    assert "Work Session" in sep8[0].name
 
 
 # --- building meetings -------------------------------------------------------
@@ -138,7 +141,6 @@ def test_maps_the_portals_meeting_types_onto_the_api_vocabulary():
     # meeting, and the API has one word for that.
     assert by_id["lps-2024-01-29-1630"] == "WORKSHOP"
     assert by_id["lps-2026-06-25-1800"] == "WORKSHOP"
-    assert by_id["lps-2021-05-05-0900"] == "WORKSHOP"
 
 
 def test_an_unmapped_type_is_kept_as_regular_with_a_warning(caplog):
@@ -149,7 +151,7 @@ def test_an_unmapped_type_is_kept_as_regular_with_a_warning(caplog):
     assert "Unheardof" in html, "the fixture's markup changed shape"
 
     _, meetings = fetch_with(html, **WIDE)
-    assert len(meetings) == 9  # nothing dropped; the ESU twin folds in
+    assert len(meetings) == 7  # the ESU twin folds in; committees are out
     assert "unmapped meeting type" in caplog.text
     assert [m for m in meetings if m.external_id == "lps-2026-09-08-1800"][
         0
@@ -162,15 +164,16 @@ def test_names_carry_the_district_and_the_meetings_own_title():
     assert names["lps-2026-09-08-1800"] == (
         "Lincoln Public Schools Board of Education Regular Meeting"
     )
-    assert "Wellness, American Civics" in names["lps-2026-03-24-1630"]
+    assert names["lps-2026-05-18-1800"] == (
+        "Lincoln Public Schools Board of Education Organizational Meeting"
+    )
 
 
 def test_the_window_filters_by_date():
     _, meetings = fetch_with(since=date(2026, 1, 1), until=date(2026, 6, 30))
     assert [m.starts_at.date() for m in meetings] == [
         date(2026, 1, 27),
-        date(2026, 3, 24),
-        date(2026, 5, 18),
+        date(2026, 5, 18),  # 2026-03-24 is a committee, and now left out
         date(2026, 6, 25),
     ]
 
@@ -191,6 +194,45 @@ def test_a_dead_portal_raises_a_scraper_error():
     ):
         with pytest.raises(ScraperError, match="Could not load"):
             LpsBoardOfEducation().fetch()
+
+
+# --- only the apex board ------------------------------------------------------
+
+
+def test_committee_meetings_are_left_out():
+    """Editors want the board itself, not its committees."""
+    _, meetings = fetch_with(**WIDE)
+    assert not [m for m in meetings if "Committee" in m.name]
+    assert not [m for m in meetings if m.starts_at.date() == date(2026, 3, 24)]
+
+
+def test_a_committee_that_never_says_committee_is_still_left_out():
+    """One governmental relations row drops the word from its title."""
+    assert NOT_THE_BOARD.search(
+        "Board of Education Governmental Relations/Community Engagement"
+    )
+
+
+def test_a_separate_interlocal_board_is_left_out():
+    """The Safe & Successful Kids Interlocal Board is written eight ways across
+    the archive, once as plain "SSKI Board of Directors"."""
+    for title in (
+        "Lincoln Safe & Successful Kids Interlocal Board",
+        "Safe and Successful Kids Interlocal (SSKI) Board",
+        "SSKI Board of Directors",
+        "Safe & Successful Kids Interlocal Board (SSKIB)",
+    ):
+        assert NOT_THE_BOARD.search(title), title
+
+
+def test_the_board_itself_is_not_caught_by_the_filter():
+    for title in (
+        "Board of Education Regular Meeting",
+        "Board of Education Special Meeting/Work Session",
+        "Board of Education ESU 18 Regular Meeting",
+        "Joint Public Meeting of School Board, City Council, County Board",
+    ):
+        assert not NOT_THE_BOARD.search(title), title
 
 
 # --- folding ESU 18 ----------------------------------------------------------

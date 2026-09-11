@@ -69,6 +69,7 @@ narrowest key the two sources agree on.
 | Lancaster County | `lnc-{series}-{date}` | Two series meet the same morning |
 | LPS Board of Education | `lps-{date}-{HHMM}` | 170 of 489 dates carry more than one meeting |
 | Planning Commission | `llcpc-{date}` | One meeting per date |
+| OPS Board of Education | `ops-{date}-{HHMM}` | 51 of 409 dates carry more than one meeting |
 
 Where a scheme cannot represent two meetings that collide, the scraper skips
 the second with a warning rather than silently overwriting the first.
