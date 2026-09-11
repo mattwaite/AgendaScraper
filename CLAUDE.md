@@ -28,6 +28,32 @@ them likely already covers a new site's platform. Omaha Public Schools needed
 no new agenda parser at all: it runs the same SPARQ portal as Lincoln's, and
 `sources/sparq.py` read all 462 of its rows unchanged.
 
+## Only the apex board
+
+Editors want the governing body itself and nothing below or beside it: the
+school board, not its committees; the county board, not a commission that
+meets in the same room. A scraper that publishes committee meetings is giving
+editors work to filter out by hand.
+
+This is not a filter you can write once and share, because each source marks
+the difference differently and some do not mark it at all:
+
+- OPS types a non-board meeting "Unit" -- but eight rows of one committee are
+  filed as Hearing and Special instead, so the name is checked as well.
+- LPS types its committees exactly like board meetings. Only the name
+  separates them, and one committee's title omits the word "Committee".
+- Lancaster works the other way round, from an allowlist of the two series it
+  recognises, so anything new is excluded until someone adds it.
+
+So: enumerate the distinct titles in the archive before writing the filter,
+count what each rule drops, and put the counts in the module docstring. Both
+times this was done the naive rule was wrong -- see `is_apex_board` in the OPS
+scraper and `NOT_THE_BOARD` in the LPS one for what the data actually said.
+
+Separate *bodies* count as non-apex too, not just committees: another board
+that happens to meet under the same roof (a pension board, an interlocal
+board) is not this agency.
+
 ## Verify a second source against the first before trusting it
 
 Where the two overlap, confirm they agree, and say so in the module docstring

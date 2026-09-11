@@ -83,6 +83,28 @@ DAYS_FORWARD = 400
 # "ESU 18", "ESU18" and "ESU #18" all appear across the two sources.
 ESU_RE = re.compile(r"(?i)\bESU\s*#?\s*18\b")
 
+# Only the apex board. Editors want the Board of Education itself -- not its
+# committees, and not the other boards that meet under the district's roof.
+# This drops 92 of the portal's 701 rows.
+#
+# Three of the terms are not "committee" and are each load-bearing:
+#
+#   interlocal / SSKI  The Safe & Successful Kids Interlocal Board, a separate
+#                      body, written eight different ways across the archive --
+#                      including once as plain "SSKI Board of Directors".
+#   governmental       The governmental relations committee, whose title drops
+#     relations        the word "Committee" on one date.
+#
+# ESU 18 is deliberately *not* here. It is the same board, in the same room, on
+# the same night -- see the note above on folding it in.
+NOT_THE_BOARD = re.compile(
+    r"(?i)\bcommittee\b"
+    r"|\binterlocal\b"
+    r"|\bSSKIB?\b"
+    r"|safe\s*(?:&|and)\s*successful\s*kids"
+    r"|governmental\s+relations"
+)
+
 # The portal's own vocabulary, mapped onto the five types the API accepts.
 # Everything it calls a committee or a working session lands on WORKSHOP.
 TYPE_MAP = {
@@ -199,7 +221,11 @@ class LpsBoardOfEducation(BaseScraper):
         the calendar's copy would never go away. A disagreement is logged
         rather than resolved: nothing yet shows which source updates first.
         """
-        board = [e for e in events if e.section == CALENDAR_SECTION]
+        board = [
+            e
+            for e in events
+            if e.section == CALENDAR_SECTION and not NOT_THE_BOARD.search(e.title)
+        ]
         if events and not board:
             raise ScraperError(
                 f"No {CALENDAR_SECTION!r} events among {len(events)} at "
@@ -334,10 +360,9 @@ class LpsBoardOfEducation(BaseScraper):
         )
 
     def _wanted(self, entry: dict) -> bool:
-        """Which of the portal's meetings belong to this agency.
+        """Whether this row is the board itself rather than some other body.
 
-        Everything, for now: the board's own meetings and its committees. ESU 18
-        is not filtered here -- it is folded into the meeting it shares a slot
-        with, in `_fold`.
+        ESU 18 is not filtered here -- it is the same board and is folded into
+        the meeting it shares a slot with, in `_fold`.
         """
-        return True
+        return not NOT_THE_BOARD.search(entry["title"])

@@ -13,7 +13,7 @@ Currently implemented:
 | Lancaster County Board of Commissioners | `lancaster_county_commissioners` | CivicPlus Agenda Center + agenda PDFs + iCalendar feed |
 | Lincoln Public Schools Board of Education | `lps_board_of_education` | SPARQ Data portal + district calendar API |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | lincoln.ne.gov calendar + landing page |
-| Omaha Public Schools Board of Education | `ops_board_of_education` | SPARQ Data portal + Finalsite district calendar (committees excluded) |
+| Omaha Public Schools Board of Education | `ops_board_of_education` | SPARQ Data portal + Finalsite district calendar |
 
 All four Lincoln agencies are done, and Omaha has begun. Every one of them
 publishes its forward schedule somewhere separate from its agendas — two
@@ -22,6 +22,10 @@ a Thrillshare events API for Lincoln's schools and a Finalsite calendar for
 Omaha's. Granicus, the Agenda Center and SPARQ each list a meeting only once
 its agenda is posted, so each of those scrapers reads a second source for the
 meetings still to come.
+
+Each scraper publishes only its agency's apex body — the board or council
+itself, not its committees and not a separate body that meets under the same
+roof.
 
 ## Setup
 
@@ -122,7 +126,12 @@ before it can duplicate the rest.
    distinguishes work sessions, budget hearings and named committees), and from
    a constant per meeting type where they aren't — Granicus and Agenda Center
    say only "City Council - Action" or "Board of Commissioners".
-3. Include meetings whose agenda isn't posted yet; `agenda_url` is optional and
+3. Publish only the agency's apex body — the board or council itself, not its
+   committees and not a separate body that meets under the same roof. Each
+   source marks that differently and some not at all, so enumerate the distinct
+   titles first and record what your filter drops; `is_apex_board` in the OPS
+   scraper and `NOT_THE_BOARD` in the LPS one are the two worked examples.
+4. Include meetings whose agenda isn't posted yet; `agenda_url` is optional and
    a later run fills it in. The planning commission publishes its schedule
    months ahead of any agenda, which is the lead time editors actually want.
    If the source withholds something the API needs — Lancaster's listing has no
@@ -132,10 +141,10 @@ before it can duplicate the rest.
    Don't worry about a value the source only sometimes exposes: submitting
    replaces the whole record, so the runner puts back any optional field the
    platform already holds that this scrape didn't find.
-4. Register the class in `scrapers/registry.py`.
-5. Save a copy of the source page under `tests/fixtures/` and write parser tests
+5. Register the class in `scrapers/registry.py`.
+6. Save a copy of the source page under `tests/fixtures/` and write parser tests
    against it.
-6. Run `python3 -m tools.verify_upsert` (sandbox), then the first real run with
+7. Run `python3 -m tools.verify_upsert` (sandbox), then the first real run with
    `--stop-on-unexpected-create`.
 
 No API code belongs in a scraper — the runner handles agency verification,

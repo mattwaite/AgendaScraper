@@ -7,7 +7,7 @@ import pytest
 
 from scrapers.agencies.ops_board_of_education import (
     OpsBoardOfEducation,
-    is_committee,
+    is_apex_board,
     canonical_name,
     external_id_for,
 )
@@ -150,7 +150,7 @@ def test_an_unmapped_type_is_kept_as_regular_with_a_warning(caplog):
     assert "Unheardof" in html, "the fixture's markup changed shape"
 
     _, meetings = fetch_with(html, **WIDE)
-    assert len(meetings) == 8  # nothing dropped beyond the committees
+    assert len(meetings) == 7  # nothing dropped beyond the non-board bodies
     assert "unmapped meeting type" in caplog.text
 
 
@@ -199,41 +199,46 @@ def test_a_dead_portal_raises_a_scraper_error():
             OpsBoardOfEducation().fetch()
 
 
-# --- committees are left out ------------------------------------------------
+# --- only the apex board ------------------------------------------------------
 
 
 def test_committee_meetings_are_left_out():
-    """The editors do not want them."""
+    """Editors want the board itself, not its committees."""
     _, meetings = fetch_with(**WIDE)
     assert not [m for m in meetings if "Committee" in m.name]
     assert not [m for m in meetings if "Civics" in m.name]
 
 
-def test_a_committee_is_matched_on_its_name_not_the_portals_type():
-    """SPARQ files committees under "Unit", but so is the retirement board, and
-    the Ad Hoc discipline committee also appears typed Hearing and Special."""
-    assert is_committee("American Civics Committee Meeting")
-    assert is_committee("Ad Hoc Student Discipline Hearing Committee of the Board")
-    assert not is_committee(
-        "Omaha School Employees' Retirement System Board of Trustees Meeting"
+def test_another_organisations_board_is_left_out():
+    """The Omaha School Employees' Retirement System Board of Trustees meets
+    under the district's roof but is not this board -- 37 rows of the archive."""
+    _, meetings = fetch_with(**WIDE)
+    assert not [m for m in meetings if "Retirement System" in m.name]
+
+
+def test_the_portal_marks_a_body_that_is_not_the_board():
+    """SPARQ types these "Unit", and every one of its 54 Unit rows is a
+    committee or another organisation's board."""
+    assert not is_apex_board(
+        "Omaha School Employees' Retirement System Board of Trustees Meeting", "Unit"
     )
-    assert not is_committee("Board of Education Workshop")
+    assert not is_apex_board("Nebraska Schools Medicaid Consortium Board Meeting", "Unit")
+    assert is_apex_board("Board of Education Workshop", "Working")
+    assert is_apex_board("Budget Hearing", "Hearing")
+
+
+def test_a_committee_filed_under_another_type_is_still_left_out():
+    """The Ad Hoc student discipline committee is typed Unit once and Hearing
+    or Special on eight other dates, so the type alone would not catch it."""
+    name = "Ad Hoc Student Discipline Hearing Committee of the Board of Education"
+    assert not is_apex_board(name, "Hearing")
+    assert not is_apex_board(name, "Special")
 
 
 def test_a_badly_titled_committee_is_caught_by_its_type_bracket():
     """One row is titled just "Committee Meeting" and another "American
     Committee Meeting", so the bracket is the field that identifies the body."""
-    assert is_committee("Special Meeting", "American Civics Committee")
-
-
-def test_a_separate_board_filed_under_the_committee_type_is_kept():
-    """37 of the 54 "Unit" rows are the retirement board, which is its own
-    board rather than a committee of this one -- so filtering on the portal's
-    type would have dropped it."""
-    _, meetings = fetch_with(**WIDE)
-    kept = [m for m in meetings if "Retirement System" in m.name]
-    assert len(kept) == 1
-    assert kept[0].meeting_type == "WORKSHOP"  # the portal types it "Unit"
+    assert not is_apex_board("Special Meeting", "Special", "American Civics Committee")
 
 
 def test_a_committee_on_the_calendar_is_left_out_too():

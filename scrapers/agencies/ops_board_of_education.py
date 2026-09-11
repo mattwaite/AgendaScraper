@@ -19,11 +19,12 @@ and three "Board of Education Town Hall" events, which SPARQ does not carry at
 all -- those are kept, since a town hall is a board event a reporter may be
 sent to, and the API does not require an agenda.
 
-Committee meetings are left out at the editors' request -- see COMMITTEE_RE
-for why that is matched on the name rather than the portal's meeting type. The
-Omaha School Employees' Retirement System Board of Trustees is *kept*: it is a
-separate board rather than a committee of this one, and it accounts for 37 of
-the 54 rows the portal files under the same type as the committees.
+Only the board itself is published. Editors want the apex body of each
+organization, so this leaves out the board's committees and also the other
+boards that meet under the district's roof -- the Omaha School Employees'
+Retirement System Board of Trustees, which accounts for 37 rows on its own, and
+the Nebraska Schools Medicaid Consortium. See `is_apex_board` for how the two
+are told apart; between them they are 62 of the portal's 462 rows.
 
 Unlike Lincoln, no ESU folding is needed here: OPS names the combined body in
 one title already, "Omaha Public Schools Board of Education and Educational
@@ -97,26 +98,36 @@ TITLE_TYPES = (
 # entry without "board" in its title was a board meeting.
 BOARD_TITLE_RE = re.compile(r"(?i)\bboard\b")
 
-# Committee meetings are left out at the editors' request.
+# Only the apex board. Editors want the Board of Education itself -- not its
+# committees, and not the other boards that meet under the district's roof.
 #
-# Matched on the name rather than the portal's type, which does not mean what
-# it looks like. SPARQ files these under "Unit", but 37 of its 54 Unit rows are
-# the Omaha School Employees' Retirement System Board of Trustees -- a separate
-# pension board, not a committee of this one -- while the Ad Hoc Student
-# Discipline Hearing Committee turns up typed Unit, Hearing *and* Special
-# across the archive. Filtering on the type would drop the wrong 37 and keep
-# the wrong 8.
+# SPARQ marks the difference itself: it types a meeting "Unit" when the body is
+# something other than the board. All 54 Unit rows in the archive are one of
+# these, and none of them is the board:
 #
-# The bracket qualifying the type is checked as well as the title. Every
-# committee row observed says "Committee" in its title, but one is titled just
-# "Committee Meeting" and another "American Committee Meeting", so the source
-# is clearly not careful with these names, and the bracket is the field that
+#     37  Omaha School Employees' Retirement System Board of Trustees
+#     14  American Civics Committee
+#      2  Nebraska Schools Medicaid Consortium Board
+#      1  Ad Hoc Student Discipline Hearing Committee
+#
+# The type alone is not quite enough. The Ad Hoc student discipline committee
+# is also filed as Hearing and Special on eight other dates, so the name is
+# checked too -- both the title and the bracket qualifying the type, since the
+# source is careless with these: one row is titled simply "Committee Meeting"
+# and another "American Committee Meeting", and the bracket is the field that
 # actually identifies the body.
+#
+# Together these drop 62 of 462 rows, and every one of the 400 that remain is
+# a meeting of the board itself.
 COMMITTEE_RE = re.compile(r"(?i)\bcommittee\b")
+UNIT_TYPE = "Unit"
 
 
-def is_committee(title: str, detail: str = "") -> bool:
-    return bool(COMMITTEE_RE.search(title) or COMMITTEE_RE.search(detail))
+def is_apex_board(title: str, source_type: str = "", detail: str = "") -> bool:
+    """Whether this row is the Board of Education rather than some other body."""
+    if source_type == UNIT_TYPE:
+        return False
+    return not (COMMITTEE_RE.search(title) or COMMITTEE_RE.search(detail))
 
 NAME_PREFIX = "Omaha Public Schools"
 
@@ -218,7 +229,7 @@ class OpsBoardOfEducation(BaseScraper):
         board = [
             e
             for e in events
-            if BOARD_TITLE_RE.search(e.title) and not is_committee(e.title)
+            if BOARD_TITLE_RE.search(e.title) and is_apex_board(e.title)
         ]
         if events and not board:
             raise ScraperError(
@@ -261,7 +272,9 @@ class OpsBoardOfEducation(BaseScraper):
         for entry in sparq.parse_listing(html, LISTING_URL):
             if not self._in_window(entry["starts_at"].date(), today):
                 continue
-            if is_committee(entry["title"], entry.get("type_detail", "")):
+            if not is_apex_board(
+                entry["title"], entry["source_type"], entry.get("type_detail", "")
+            ):
                 continue
 
             external_id = external_id_for(entry["starts_at"])
