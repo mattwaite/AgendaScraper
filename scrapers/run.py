@@ -303,8 +303,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        client = PlatformClient()
-        verify_agency(client, scraper)
+        try:
+            client = PlatformClient()
+            verify_agency(client, scraper)
+        except PlatformError:
+            # A dry run POSTs nothing, so it should not need a key to show what
+            # it would post -- the first thing a newcomer tries. The agency-name
+            # check is the one thing lost, and the log says so.
+            if not args.dry_run:
+                raise
+            client = None
+            log.warning(
+                "no API key, so the agency name was not checked against the "
+                "platform; the payloads below are otherwise complete"
+            )
         counts = submit(
             client, scraper, meetings, args.dry_run, args.stop_on_unexpected_create
         )
