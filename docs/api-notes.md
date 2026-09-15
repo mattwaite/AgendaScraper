@@ -79,6 +79,7 @@ a new record and strands the old one.
 | Sarpy County | `sarpy-{portal id}` | One source covers past and future, so the id is safe — and beats a date key |
 | Omaha Inland Port Authority | `oipa-{date}` | One meeting per date; the time is *excluded* on purpose — see below |
 | OPPD Board of Directors | `oppd-{date}` | At most one meeting a month; the time is *excluded* for the same reason |
+| Downtown BID (ODIDA) | `odida-{YYYY-MM}` | The *date* is computed from a rule and is wrong 1 time in 13, so it stays out; one meeting a month |
 
 Where a scheme cannot represent two meetings that collide, the scraper skips
 the second with a warning rather than silently overwriting the first.
@@ -182,6 +183,14 @@ calendar ahead of agendas.
 - `from` / `to` on `GET /meetings` accept bare `YYYY-MM-DD` and cover that whole
   calendar day in America/Chicago, so no padding is needed.
 - `GET /meetings` requires `agencyId`, defaults to `limit=50`, and caps at 200.
+- **`details`, `livestreamUrl` and `contactPerson` are stored but never
+  returned.** Verified 2026-09-14 against ZZ Test Agency: POSTing a changed
+  `details` answers `updated, changed: ["details"]`, and likewise for
+  `livestreamUrl` — so the platform holds them — but neither `GET /meetings`
+  nor `GET /meetings/{id}` includes the keys at all. Do not read a missing
+  `details` back as "not stored", and do not expect to verify these fields
+  through the API. ODIDA submits both (the meeting topic or an inferred-date
+  note, and the Zoom link).
 
 ## Recovery
 
@@ -265,3 +274,8 @@ run of a new scraper.
    find an agenda URL this week erases the one an editor was relying on. If
    omitted-means-unchanged were the rule, the `carry_forward` workaround could
    go. Either way it's worth a line in the guide.
+3. **`details`, `livestreamUrl` and `contactPerson` don't come back on GET.**
+   They are stored -- a changed value is reported in `changed` -- but neither
+   read endpoint returns them. Are they shown to editors in the UI? ODIDA now
+   relies on `details` to say when a date was inferred rather than published,
+   and that note is only useful if someone can see it.

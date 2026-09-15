@@ -1,34 +1,35 @@
 # Where things stand
 
-Last updated **2026-09-11**, after OPPD (PR #12) merged.
+Last updated **2026-09-14**, after ODIDA (PR #13) merged.
 
-`main` is clean, 330 tests pass offline, no open PRs and no stray branches.
+`main` is clean, 363 tests pass offline, no open PRs and no stray branches.
 
-## The eight that are live
+## The nine that are live
 
 | Agency | Slug | Meetings on the platform | Future |
 |---|---|---|---|
 | Lancaster County Board of Commissioners | `lancaster_county_commissioners` | 23 | 22 |
-| Lincoln City Council | `lincoln_city_council` | 5 | 5 |
+| Lincoln City Council | `lincoln_city_council` | 5 | 4 |
 | Lincoln Public Schools Board of Education | `lps_board_of_education` | 17 | 16 |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | 5 | 5 |
 | Omaha Inland Port Authority | `omaha_port_authority` | 3 | 3 |
 | Omaha Public Power District | `oppd_board_of_directors` | 4 | 4 |
 | Omaha Public Schools Board of Education | `ops_board_of_education` | 25 | 23 |
 | Sarpy County Board of Commissioners | `sarpy_county_commissioners` | 6 | 6 |
+| Downtown Business Improvement District (ODIDA) | `downtown_bid` | 10 | 10 |
 
-**91 meetings, 84 of them in the future.** Counted 2026-09-11.
+**101 meetings, 93 of them in the future.** Counted 2026-09-14 by reading the platform, not by adding to Friday's number.
 
 Nothing here runs on a schedule. Every one of these is a manual
 `python -m scrapers.run <slug>`, and the numbers above go stale on their own —
 a meeting that has happened stops being a future meeting whether or not anyone
 re-runs anything. Re-running is safe and idempotent; that is the whole design.
 
-## The five that are not
+## The four that are not — all on the same block
 
 ### Blocked on access, not on code
 
-Three sites sit behind an **Akamai edge block** — `server: AkamaiGHost`, a bare
+Four sites sit behind an **Akamai edge block** — `server: AkamaiGHost`, a bare
 "Access Denied" body. They refuse plain `curl`, real headless Chromium and
 WebFetch alike, so this is not a user-agent problem and not something a
 different HTTP client solves.
@@ -38,6 +39,7 @@ different HTTP client solves.
 | Omaha City Council | cityofomaha.org |
 | Douglas County Board of Commissioners | douglascounty-ne.gov |
 | Omaha Streetcar Authority | omahastreetcar.org |
+| Blackstone Business Improvement District | a City of Omaha subdomain — same interstitial (Matt, 2026-09-14) |
 
 **These were left alone deliberately.** A public agency's meeting schedule is
 public, but defeating an access control is not ours to do — the standing rule
@@ -49,18 +51,10 @@ douglascounty-ne.gov are WordPress**, so `/wp-json/wp/v2/` would very likely be
 a clean JSON feed the moment the block is lifted. That is the first thing to
 try, not the last.
 
-### Probably not worth building yet
-
-| Agency | What is actually there |
-|---|---|
-| Downtown BID (ODIDA) | Site reachable, no sign it publishes agendas at all |
-| Blackstone BID | Same |
-
-Both are reachable — the block is not the issue. Neither appears to post
-meeting agendas or a schedule anywhere public. **Confirm with the client that
-these bodies publish anything before spending time on them.** A BID is not
-subject to the same notice requirements as a county board, and it is possible
-the answer is that there is nothing to scrape.
+**There is nothing left to build until that escalation lands.** Every agency
+that could be scraped has been. Friday's version of this file put Blackstone
+under "probably doesn't publish agendas" — wrong on both counts: it does, and
+the page is on a city subdomain behind the same block as the city and county.
 
 ## Three records on the platform this repo did not create
 

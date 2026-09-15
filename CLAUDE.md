@@ -3,8 +3,9 @@
 Scrapers that pull government meeting schedules into the NE Civic Newsroom API,
 where Flatwater Free Press editors assign reporters to cover them. The four
 Lincoln agencies are done, as are Omaha Public Schools, Sarpy County, the
-Inland Port Authority and OPPD; five Omaha bodies remain, three of them behind
-an Akamai block awaiting the client's escalation.
+Inland Port Authority, OPPD and the Downtown BID. The four that remain are all
+behind an Akamai block awaiting the client's escalation; there is nothing left
+to build until that lands.
 
 **Read `docs/api-notes.md` before touching the API, and README.md's "Adding a
 scraper" before writing one.** Both record behavior that was established
@@ -41,6 +42,15 @@ the board adopt next year's schedule every September, and that resolution PDF
 carries a date, a time and a place for all twelve months. It was the only way
 to see past the end of the year. Before settling for a thin schedule page, look
 in the archive for the meeting where the schedule itself was approved.
+
+ODIDA has no forward schedule at all, only a standing rule — last Tuesday at
+5:30, skipping three months — so its future dates are *computed*. That is
+allowed, with three conditions the scraper meets: check the rule against the
+archive first and put the number in the docstring (12 of 13 held; January
+2026 was a Monday); check it at runtime against whatever live statement the
+page does make (its one "Next Meeting" line) and warn on drift; and key on the
+month, not the computed date, so the archive correcting a date updates the
+record instead of stranding it. Every inferred meeting says so in `details`.
 
 Where a source gives a date but no time, prefer reading the real time from the
 agenda and standing in the body's published hour until that exists, rather than
