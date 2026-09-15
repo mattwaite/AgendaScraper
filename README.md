@@ -17,6 +17,7 @@ Currently implemented:
 | Omaha Inland Port Authority | `omaha_port_authority` | omahaipa.com meetings page + agenda PDFs |
 | Omaha Public Power District Board of Directors | `oppd_board_of_directors` | oppd.com schedule block + adopted schedule resolution + agenda PDFs |
 | Sarpy County Board of Commissioners | `sarpy_county_commissioners` | CivicWeb portal meetings service |
+| Downtown Business Improvement District (ODIDA) | `downtown_bid` | omahadowntown.org board page: standing rule + announced next meeting + archive |
 
 All four Lincoln agencies are done, and Omaha has begun. Most of them publish
 their forward schedule somewhere separate from their agendas — two OpenCities
@@ -32,6 +33,11 @@ OPPD goes the other way and needs three. Its page lists only the meetings left
 in the current year and gives no times at all, so the times — and the whole of
 next year — come from the schedule the board adopts by resolution every
 September, and the agenda PDF settles the imminent meeting.
+
+ODIDA publishes no forward schedule at all, only a rule — last Tuesday of the
+month at 5:30, skipping July, November and December — so its future dates are
+computed from that rule and checked against the one "Next Meeting" line and
+the archive of meetings already held.
 
 Each scraper publishes only its agency's apex body — the board or council
 itself, not its committees and not a separate body that meets under the same

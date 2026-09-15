@@ -79,6 +79,7 @@ a new record and strands the old one.
 | Sarpy County | `sarpy-{portal id}` | One source covers past and future, so the id is safe — and beats a date key |
 | Omaha Inland Port Authority | `oipa-{date}` | One meeting per date; the time is *excluded* on purpose — see below |
 | OPPD Board of Directors | `oppd-{date}` | At most one meeting a month; the time is *excluded* for the same reason |
+| Downtown BID (ODIDA) | `odida-{YYYY-MM}` | The *date* is computed from a rule and is wrong 1 time in 13, so it stays out; one meeting a month |
 
 Where a scheme cannot represent two meetings that collide, the scraper skips
 the second with a warning rather than silently overwriting the first.
