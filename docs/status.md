@@ -9,7 +9,7 @@ Last updated **2026-09-14**, after ODIDA (PR #13) merged.
 | Agency | Slug | Meetings on the platform | Future |
 |---|---|---|---|
 | Lancaster County Board of Commissioners | `lancaster_county_commissioners` | 23 | 22 |
-| Lincoln City Council | `lincoln_city_council` | 5 | 5 |
+| Lincoln City Council | `lincoln_city_council` | 5 | 4 |
 | Lincoln Public Schools Board of Education | `lps_board_of_education` | 17 | 16 |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | 5 | 5 |
 | Omaha Inland Port Authority | `omaha_port_authority` | 3 | 3 |
@@ -18,7 +18,7 @@ Last updated **2026-09-14**, after ODIDA (PR #13) merged.
 | Sarpy County Board of Commissioners | `sarpy_county_commissioners` | 6 | 6 |
 | Downtown Business Improvement District (ODIDA) | `downtown_bid` | 10 | 10 |
 
-**101 meetings, 94 of them in the future.** Counted 2026-09-14.
+**101 meetings, 93 of them in the future.** Counted 2026-09-14 by reading the platform, not by adding to Friday's number.
 
 Nothing here runs on a schedule. Every one of these is a manual
 `python -m scrapers.run <slug>`, and the numbers above go stale on their own —
