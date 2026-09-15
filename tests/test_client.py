@@ -267,6 +267,48 @@ def test_dry_run_never_calls_the_api():
     assert counts["created"] == 0
 
 
+class RunnableScraper(FakeScraper):
+    """Enough of a scraper for run.main() to drive end to end."""
+
+    def __init__(self, since=None, until=None):
+        self.skipped = []
+
+    def fetch(self):
+        return [make_meeting()]
+
+
+def test_a_dry_run_works_with_no_api_key_at_all(monkeypatch, caplog):
+    """The first thing a newcomer tries, before they have a key. It POSTs
+    nothing, so it prints the payloads and says which check it skipped."""
+    import logging
+
+    from scrapers import run as runner
+
+    monkeypatch.delenv("PLATFORM_API_KEY", raising=False)
+    caplog.set_level(logging.WARNING)
+    with patch("scrapers.run.registry.get", return_value=RunnableScraper), \
+         patch("scrapers.client.load_dotenv"):
+        code = runner.main(["fake", "--dry-run"])
+
+    assert code == 0
+    assert "agency name was not checked" in caplog.text
+
+
+def test_a_real_run_still_refuses_without_a_key(monkeypatch, caplog):
+    import logging
+
+    from scrapers import run as runner
+
+    monkeypatch.delenv("PLATFORM_API_KEY", raising=False)
+    caplog.set_level(logging.ERROR)
+    with patch("scrapers.run.registry.get", return_value=RunnableScraper), \
+         patch("scrapers.client.load_dotenv"):
+        code = runner.main(["fake"])
+
+    assert code == 1
+    assert "PLATFORM_API_KEY is not set" in caplog.text
+
+
 # --- carrying values forward -------------------------------------------------
 #
 # Submitting replaces the whole record rather than merging into it, so a payload

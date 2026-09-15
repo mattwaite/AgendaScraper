@@ -69,7 +69,7 @@ Useful flags:
 
 | Flag | Effect |
 |---|---|
-| `--dry-run` | Scrape and print the exact JSON payloads, submit nothing. Reports `would submit N` rather than guessing which the platform already holds |
+| `--dry-run` | Scrape and print the exact JSON payloads, submit nothing. Reports `would submit N` rather than guessing which the platform already holds. Works without an API key (it then skips the agency-name check and says so) |
 | `--format csv\|json` with `--out FILE` | Write meetings to a file instead of submitting |
 | `--since` / `--until` | Override the default window (7 days back → 400 days ahead), `YYYY-MM-DD` |
 | `--limit N` | Keep only the earliest N meetings — for `--dry-run` and CSV/JSON output |
