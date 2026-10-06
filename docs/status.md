@@ -1,6 +1,7 @@
 # Where things stand
 
-Last updated **2026-09-14**, after ODIDA (PR #13) merged.
+Last updated **2026-10-06**. Lancaster County has gone behind a Cloudflare
+block and its scraper is down — see below.
 
 `main` is clean, 363 tests pass offline, no open PRs and no stray branches.
 
@@ -8,7 +9,7 @@ Last updated **2026-09-14**, after ODIDA (PR #13) merged.
 
 | Agency | Slug | Meetings on the platform | Future |
 |---|---|---|---|
-| Lancaster County Board of Commissioners | `lancaster_county_commissioners` | 23 | 22 |
+| Lancaster County Board of Commissioners ⚠️ | `lancaster_county_commissioners` | 23 | 16 |
 | Lincoln City Council | `lincoln_city_council` | 5 | 4 |
 | Lincoln Public Schools Board of Education | `lps_board_of_education` | 17 | 16 |
 | Lincoln-Lancaster County Planning Commission | `planning_commission` | 5 | 5 |
@@ -18,7 +19,46 @@ Last updated **2026-09-14**, after ODIDA (PR #13) merged.
 | Sarpy County Board of Commissioners | `sarpy_county_commissioners` | 6 | 6 |
 | Downtown Business Improvement District (ODIDA) | `downtown_bid` | 10 | 10 |
 
-**101 meetings, 93 of them in the future.** Counted 2026-09-14 by reading the platform, not by adding to Friday's number.
+**101 meetings, 86 of them in the future.** Counted 2026-10-06 by reading the
+platform. Eight of the nine scrapers run; Lancaster does not.
+
+## Lancaster County is blocked as of 2026-10-06
+
+Its scraper fails on every run. `www.lancaster.ne.gov` now answers plain HTTP
+with a **Cloudflare 403** — "Sorry, you have been blocked", served from the
+`civicplus.io` zone, which is the county's CMS vendor. It is a firewall denial,
+not a JavaScript challenge, so it is the same kind of thing as Omaha's Akamai
+block and gets the same treatment: escalate, do not route around.
+
+Reference for whoever administers it: `CF-RAY: a467b6474b6218b6-OMA`,
+2026-10-06 21:20:47 UTC.
+
+**Both of this agency's sources are behind it.** The Agenda Center listing and
+the iCalendar feed share the host, so there is no partial degradation to fall
+back on — the agency is simply dark. `/robots.txt` is 403 as well.
+
+There is runway but not much: the platform still holds 16 future meetings
+through **2026-12-22**. Nothing new will be added, no agenda URL will ever
+attach to the ones already filed, and a rescheduled meeting will not be caught.
+
+Three alternatives were checked and none works:
+
+| Alternative | Result |
+|---|---|
+| Granicus `lnklan` view_id=1, "Lancaster Default View" | Exists and is reachable, but completely empty — no upcoming events, no archives |
+| Nebraska Public Meeting Calendar (`nebraska.gov/calendar`) | State agencies only. Six items, a five-day window, zero county or city bodies |
+| `lincoln.ne.gov` | Carries no county board content; the two governments share a building, not a calendar |
+
+**A likely cause worth putting in the escalation:** our User-Agent is
+`flatwater-agenda-scraper/1.0`, and the literal word *scraper* is the kind of
+token a Cloudflare managed bot ruleset matches. That is a guess, not a finding.
+
+It was deliberately **not** tested by trying other User-Agent strings. Finding
+a wording that slips through is exactly the circumvention this project does not
+do, and it would be indefensible while we are simultaneously asking Omaha to
+allowlist us *by* User-Agent. The honest version of that fact belongs in the
+request instead: we chose a name that says what we are, and we would rather it
+be allowlisted than disguised.
 
 Nothing here runs on a schedule. Every one of these is a manual
 `python -m scrapers.run <slug>`, and the numbers above go stale on their own —
